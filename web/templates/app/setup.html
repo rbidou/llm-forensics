@@ -1,0 +1,84 @@
+{% extends "app/base.html" %}
+{% from "app/macros.html" import directory_picker %}
+{% set active_page = 'setup' %}
+{% block title %}LLM Forensics - Settings{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2>Settings</h2>
+    <p>Where the web server listens, and the report and models folders</p>
+</div>
+
+<!-- 1. INPUT -->
+<div class="panel">
+    <div class="panel-header">
+        <h3>Web server</h3>
+        <span class="badge badge-neutral" id="server-default-badge" style="display: none;">default</span>
+    </div>
+    <div class="panel-body">
+        <div class="form-inline">
+            <div class="form-group">
+                <label for="host-input">Listening IP address</label>
+                <input type="text" class="form-control form-control-mono" id="host-input"
+                       autocomplete="off" spellcheck="false" style="width: 260px;">
+            </div>
+            <div class="form-group">
+                <label for="port-input">Port</label>
+                <input type="number" class="form-control form-control-mono" id="port-input"
+                       min="1" max="65535" style="width: 120px;">
+            </div>
+        </div>
+        <p class="field-description">
+            127.0.0.1 keeps the interface on this machine; 0.0.0.0 listens on every network interface, and other
+            machines then reach it through one of this machine's addresses. Changes apply the next time the web
+            server starts (<span class="text-mono">python run.py web</span>, whose <span class="text-mono">--host</span>
+            and <span class="text-mono">--port</span> override them for one run).
+        </p>
+        <p class="field-description" id="server-default-hint"></p>
+        <p class="field-description" id="server-exposed-warning" style="color: var(--warning); display: none;">
+            Other machines on the network will reach this server. It has no authentication and reads local model
+            files.
+        </p>
+
+        <div style="margin-top: 16px;">
+            <button class="btn btn-primary" id="server-save-btn">Save</button>
+            <button class="btn" id="server-reset-btn">Restore the default</button>
+        </div>
+    </div>
+</div>
+
+<!-- 2. DIRECTORIES -->
+<div class="panel">
+    <div class="panel-header">
+        <h3>Directories</h3>
+        <span class="badge badge-neutral" id="directories-default-badge" style="display: none;">default</span>
+    </div>
+    <div class="panel-body">
+        {{ directory_picker('reports-dir', 'Report directory',
+            'Where reports are saved and read. The folder is created if it does not exist. Applies at once.') }}
+        {{ directory_picker('models-dir', 'Default models directory',
+            "Where the model pickers start browsing. Must be an existing folder; leave empty to open on the server's working directory.") }}
+
+        <div style="margin-top: 16px;">
+            <button class="btn btn-primary" id="directories-save-btn">Save</button>
+            <button class="btn" id="directories-reset-btn">Restore the defaults</button>
+        </div>
+    </div>
+</div>
+
+<!-- 3. ERROR -->
+<div id="error-section" style="display: none;">
+    <div class="panel">
+        <div class="panel-body">
+            <div class="empty-state">
+                <p id="error-message" style="color: var(--danger);"></p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/directory-picker.js') }}"></script>
+<script src="{{ url_for('static', filename='js/setup.js') }}"></script>
+{% endblock %}

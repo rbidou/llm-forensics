@@ -1,0 +1,5 @@
+{% extends "base.html.j2" %}
+{% from "vocab_sections.html.j2" import vocab_sections %}
+{% block content %}
+{{ vocab_sections(data) }}
+{% endblock %}

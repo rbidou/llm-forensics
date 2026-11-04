@@ -1,0 +1,5 @@
+{% extends "base.html.j2" %}
+{% from "shifts_sections.html.j2" import shifts_sections %}
+{% block content %}
+{{ shifts_sections(data) }}
+{% endblock %}

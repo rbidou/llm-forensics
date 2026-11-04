@@ -1,0 +1,69 @@
+{% extends "base.html.j2" %}
+{% import "macros.html.j2" as m %}
+{% from "shifts_sections.html.j2" import shifts_sections %}
+{% block content %}
+{# One discovery table (parents or children): repository, relation, downloads and size, full width. #}
+{% macro repo_table(rows) %}
+<div class="table-scroll"><table class="data-table">
+    <thead><tr><th>Repository</th><th>Relation</th><th class="num">Downloads</th><th class="num">Size</th></tr></thead>
+    <tbody>{% for row in rows %}<tr>
+        <td class="name">{{ row.repo }}</td>
+        <td><span class="tag">{{ row.relation }}</span></td>
+        <td class="num">{{ row.downloads|num }}</td>
+        <td class="num">{% if row.size_gb is not none %}{{ row.size_gb|num }} GB{% else %}{{ MISSING }}{% endif %}</td>
+    </tr>{% endfor %}</tbody>
+</table></div>
+{% endmacro %}
+{% set discovery = data.discovery or {} %}
+{% set pairs = data.pairs or [] %}
+{% set failed = pairs|selectattr("error")|list %}
+<div class="stats-grid">
+    {{ m.stat_card("Parents", (discovery.parents or [])|length) }}
+    {{ m.stat_card("Children", (discovery.children or [])|length) }}
+    {{ m.stat_card("Pairs compared", pairs|length) }}
+    {{ m.stat_card("Failed", failed|length) }}
+    {{ m.stat_card("Skipped", (discovery.skipped or [])|length) }}
+</div>
+
+<section class="panel">
+    <div class="panel-header">
+        <h3>Discovery</h3>
+        <span><span class="key-id">{{ discovery.target }}</span> <span class="tag">{{ discovery.kind }}</span> <span class="tag">mode: {{ discovery.mode }}</span></span>
+    </div>
+    <div class="panel-body">
+        <p class="hint">From Hub metadata only (base_model tags and model card); nothing here is verified on the weights.</p>
+        <div class="section-label">Declared parents</div>
+        {% if discovery.parents %}{{ repo_table(discovery.parents) }}{% else %}<p class="text-muted">None declared.</p>{% endif %}
+        <div class="section-label">Children</div>
+        {% if discovery.children %}{{ repo_table(discovery.children) }}{% else %}<p class="text-muted">None found.</p>{% endif %}
+        {% if discovery.skipped %}
+        <div class="section-label">Skipped</div>
+        <div class="table-scroll"><table class="data-table">
+            <thead><tr><th>Repository</th><th>Reason</th></tr></thead>
+            <tbody>{% for skipped in discovery.skipped %}<tr><td class="name">{{ skipped.repo }}</td><td>{{ skipped.reason }}</td></tr>{% endfor %}</tbody>
+        </table></div>
+        {% endif %}
+        {% if discovery.notes and discovery.notes != meta.notes %}
+        <div class="section-label">Discovery notes</div>
+        <ul class="message-list">{% for note in discovery.notes %}<li>{{ note }}</li>{% endfor %}</ul>
+        {% endif %}
+    </div>
+</section>
+
+{% for result in pairs %}
+{% set pair = result.pair or {} %}
+<h2><span class="key-id">{{ pair.parent }}</span> → <span class="key-id">{{ pair.child }}</span> <span class="tag">{{ pair.kind }}</span></h2>
+{% if result.error %}
+{{ m.error_banner(result.error) }}
+{% elif result.shifts %}
+{% set pair_meta = result.shifts.meta or {} %}
+{{ m.message_panel("Pair warnings", pair_meta.warnings, "warning") }}
+{{ m.message_panel("Pair notes", pair_meta.notes) }}
+{{ shifts_sections(result.shifts) }}
+{% else %}
+<p class="text-muted">No result for this pair.</p>
+{% endif %}
+{% else %}
+<div class="verdict none">No pair to compare.</div>
+{% endfor %}
+{% endblock %}

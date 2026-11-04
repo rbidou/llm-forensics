@@ -1,0 +1,59 @@
+{% extends "app/base.html" %}
+{% import "app/macros.html" as m with context %}
+{% set active_page = 'token-shifts' %}
+{% block title %}LLM Forensics - Token Shifts{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2>Token Shifts</h2>
+    <p>The heaviest weight updates, read through the vocabulary: which tokens each update promotes, or reacts to</p>
+</div>
+
+{{ m.feature_banner('shifts') }}
+
+<!-- 1. INPUT -->
+<div class="panel" id="input-panel">
+    <div class="panel-header">
+        <h3>Input</h3>
+        <button class="panel-toggle" type="button" aria-expanded="true" aria-controls="input-body"
+                data-panel-name="the input" aria-label="Collapse the input">
+            <span class="panel-toggle-chevron" aria-hidden="true">&rsaquo;</span>
+        </button>
+    </div>
+    <div class="panel-body" id="input-body">
+        {{ m.model_picker('base', 'Base model', 'Also provides the tokenizer and the vocabulary matrices.') }}
+        {{ m.model_picker('tuned', 'Tuned model', 'Full or merged weights, a LoRA adapter or checkpoint, GGUF or bitsandbytes.') }}
+        <div class="form-grid">
+            <div class="form-group">
+                <label for="updates-input">Updates to project</label>
+                <input type="number" class="form-control form-control-mono" id="updates-input" value="10" min="1" max="200">
+                <p class="field-description">The heaviest 2-D updates (by leading singular value), 1 to 200.</p>
+            </div>
+            <div class="form-group">
+                <label for="tokens-input">Tokens listed</label>
+                <input type="number" class="form-control form-control-mono" id="tokens-input" value="15" min="1" max="100">
+                <p class="field-description">At each end of a direction and per embedding matrix, 1 to 100.</p>
+            </div>
+        </div>
+        <div class="button-row">
+            {{ m.run_button('shifts', 'Analyse shifts') }}
+        </div>
+    </div>
+</div>
+
+{{ m.job_sections('Analysing token shifts') }}
+
+<!-- 4. RESULTS: the risk summary only; every detail is in the saved report. -->
+<div id="results-section" style="display: none;">
+    <div class="button-row" id="result-actions"></div>
+
+    <h2 class="group-title">Summary</h2>
+    <div id="results-verdict" class="verdict"></div>
+    <ul class="message-list" id="summary-lines" style="display: none;"></ul>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/model-picker.js') }}"></script>
+<script src="{{ url_for('static', filename='js/shifts.js') }}"></script>
+{% endblock %}

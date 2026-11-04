@@ -1,0 +1,127 @@
+{% extends "app/base.html" %}
+{% import "app/macros.html" as m with context %}
+{% set active_page = 'hub-lineage' %}
+{% block title %}LLM Forensics - Hub Lineage{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2>Hub Lineage</h2>
+    <p>The declared parents and children of a Hugging Face model, then the static token-shift comparison of the pairs you choose</p>
+</div>
+
+{{ m.feature_banner('lineage') }}
+
+<!-- 1. INPUT -->
+<div class="panel" id="input-panel">
+    <div class="panel-header">
+        <h3>Input</h3>
+        <button class="panel-toggle" type="button" aria-expanded="true" aria-controls="input-body"
+                data-panel-name="the input" aria-label="Collapse the input">
+            <span class="panel-toggle-chevron" aria-hidden="true">&rsaquo;</span>
+        </button>
+    </div>
+    <div class="panel-body" id="input-body">
+        <div class="form-group">
+            <label for="model-input">Model</label>
+            <div class="autocomplete-wrapper" style="max-width: 560px;">
+                <input type="text" class="form-control form-control-mono" id="model-input"
+                       placeholder="Hugging Face repository id (e.g. Qwen/Qwen2.5-Coder-1.5B)" autocomplete="off">
+                <div class="autocomplete-dropdown" id="model-input-dropdown"></div>
+            </div>
+        </div>
+        <div class="form-grid">
+            <div class="form-group">
+                <label for="mode-select">Mode</label>
+                <select class="form-control" id="mode-select">
+                    <option value="auto">Parents and children</option>
+                    <option value="parent">Parents only</option>
+                    <option value="children">Children only</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="variants-input">Maximum variants</label>
+                <input type="number" class="form-control form-control-mono" id="variants-input" value="5" min="1" max="50">
+                <p class="field-description">Children kept, the most downloaded first.</p>
+            </div>
+            <div class="form-group">
+                <label for="size-input">Maximum size (GB)</label>
+                <input type="number" class="form-control form-control-mono" id="size-input" value="8" min="0.1" step="0.1">
+                <p class="field-description">Larger full-weight children are skipped.</p>
+            </div>
+        </div>
+        <div class="button-row">
+            {{ m.run_button('lineage', 'Discover relatives') }}
+        </div>
+    </div>
+</div>
+
+{{ m.job_sections('Hub Lineage') }}
+
+<!-- 4. RESULTS -->
+<div id="results-section" style="display: none;">
+    <div class="panel" id="discovery-panel">
+        <div class="panel-header">
+            <h3>Discovery</h3>
+            <span class="tech-id" id="discovery-target"></span>
+            <button class="panel-toggle" type="button" aria-expanded="true" aria-controls="discovery-body"
+                    data-panel-name="the discovery" aria-label="Collapse the discovery">
+                <span class="panel-toggle-chevron" aria-hidden="true">&rsaquo;</span>
+            </button>
+        </div>
+        <div class="panel-body" id="discovery-body">
+            <div id="parents-block">
+                <div class="section-label">Parents</div>
+                <div class="table-scroll">
+                    <table class="data-table">
+                        <thead><tr><th>Relation</th><th>Parent</th><th style="width: 50px;"></th></tr></thead>
+                        <tbody id="parents-body"></tbody>
+                    </table>
+                </div>
+            </div>
+            <div id="children-block">
+                <div class="section-label">Children</div>
+                <div class="table-scroll">
+                    <table class="data-table">
+                        <thead><tr><th>Child</th><th>Relation</th><th>Downloads</th><th style="width: 50px;"></th></tr></thead>
+                        <tbody id="children-body"></tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="section-label">Comparable pairs</div>
+            <div class="table-scroll">
+                <table class="data-table">
+                    <thead><tr><th style="width: 50px;">Use</th><th>Parent</th><th>Child</th><th>Kind</th></tr></thead>
+                    <tbody id="pairs-body"></tbody>
+                </table>
+            </div>
+            <div id="skipped-block">
+                <div class="section-label">Skipped</div>
+                <div class="table-scroll">
+                    <table class="data-table">
+                        <thead><tr><th>Repository</th><th>Reason</th><th style="width: 50px;"></th></tr></thead>
+                        <tbody id="skipped-body"></tbody>
+                    </table>
+                </div>
+            </div>
+            {{ m.messages_block('discovery-notes', 'Notes') }}
+            <div class="button-row">
+                {{ m.run_button('lineage', 'Analyse the selected pairs', 'analyse-btn') }}
+            </div>
+        </div>
+    </div>
+
+    <!-- The pair comparison, finished: the lineage summary only; every detail is in the saved report. -->
+    <div id="analysis-panel" style="display: none;">
+        <div class="button-row" id="result-actions"></div>
+
+        <h2 class="group-title">Lineage summary</h2>
+        <div id="results-verdict" class="verdict"></div>
+        <ul class="message-list" id="summary-lines" style="display: none;"></ul>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/model-picker.js') }}"></script>
+<script src="{{ url_for('static', filename='js/lineage.js') }}"></script>
+{% endblock %}

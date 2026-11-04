@@ -1,0 +1,200 @@
+{# The sections of a provenance result (ProvenanceResult), shared by the provenance and assessment reports. #}
+{% import "macros.html.j2" as m %}
+
+{% macro provenance_sections(data) %}
+{% set ranking = data.ranking or [] %}
+{% set best = ranking|selectattr("ref", "equalto", data.best)|first if data.best else none %}
+{% set suspect = data.suspect or {} %}
+
+{% if best %}
+<div class="verdict {{ best.rank|verdict_class }}">
+    {{ best.verdict }}
+    <span class="verdict-detail">best weight-level match: <span class="mono">{{ best.ref }}</span> (rank {{ best.rank }}, median raw cosine {{ best.raw_med|num }})</span>
+</div>
+{% elif ranking %}
+<div class="verdict none">
+    {{ ranking[0].verdict }}
+    <span class="verdict-detail">no candidate shows weight-level kinship; closest: <span class="mono">{{ ranking[0].ref }}</span></span>
+</div>
+{% else %}
+<div class="verdict none">No candidate could be compared.</div>
+{% endif %}
+
+<section class="panel">
+    <div class="panel-header"><h3>Suspect</h3><span class="key-id">{{ suspect.ref }}</span></div>
+    <div class="panel-body">
+        {{ m.kv_table({"label": suspect.label, "architecture": suspect.architecture, "declared bases": suspect.declared_bases or []}) }}
+    </div>
+</section>
+
+<div class="stats-grid">
+    {{ m.stat_card("Gathered", data.gathered|num) }}
+    {{ m.stat_card("Compatible", data.compatible|num) }}
+    {{ m.stat_card("Screened", (data.screen or [])|length) }}
+    {{ m.stat_card("Deep compared", (data.deep or [])|length) }}
+    {{ m.stat_card("Skipped", (data.skipped or [])|length) }}
+</div>
+
+<section class="panel">
+    <div class="panel-header"><h3>Ranking</h3><span class="text-muted">by rank, then median raw cosine</span></div>
+    <div class="panel-body">
+        {% if ranking %}
+        <div class="table-scroll"><table class="data-table">
+            <thead><tr><th class="num">Rank</th><th>Candidate</th><th>Origin</th><th>Verdict</th><th class="num">Raw med</th><th class="num">Circuits r</th></tr></thead>
+            <tbody>
+            {% for row in ranking %}
+            {% set is_best = data.best and row.ref == data.best %}
+            <tr{% if is_best %} class="row-best"{% endif %}>
+                <td class="num">{{ row.rank }}</td>
+                <td class="name">{{ row.ref }}{% if is_best %} <span class="badge badge-accent">best</span>{% endif %}</td>
+                <td><span class="tag" title="{{ row.origin }}">{{ row.origin|origin_abbr }}</span></td>
+                <td><span class="badge {{ row.rank|rank_badge }}">{{ row.verdict }}</span></td>
+                <td class="num">{{ row.raw_med|num }}</td>
+                <td class="num">{{ row.inv_mean|num }}</td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table></div>
+        <div class="legend-row">{{ m.legend_block("Origin", LABEL_GLOSSARY["Origin"]) }}</div>
+        {% else %}<p class="text-muted">No successful deep comparison.</p>{% endif %}
+    </div>
+</section>
+
+<section class="panel">
+    <div class="panel-header"><h3>Screen</h3><span class="text-muted">stage 1: first rows of layer 0</span></div>
+    <div class="panel-body">
+        {% if data.screen %}
+        <div class="table-scroll"><table class="data-table">
+            <thead><tr><th>Candidate</th><th>Origin</th><th>Kind</th><th class="num">Raw cos</th><th class="num">Norm r</th><th>Error</th></tr></thead>
+            <tbody>
+            {% for row in data.screen %}
+            <tr>
+                <td class="name">{{ row.ref }}</td>
+                <td><span class="tag" title="{{ row.origin }}">{{ row.origin|origin_abbr }}</span></td>
+                <td>{% if row.is_root %}<span class="badge badge-info">root</span>{% else %}<span class="badge badge-neutral">derived</span>{% endif %}</td>
+                <td class="num">{{ row.raw_cos|num }}</td>
+                <td class="num">{{ row.norm_r|num }}</td>
+                <td>{% if row.error %}<span class="badge badge-danger">error</span> <span class="mono">{{ row.error }}</span>{% endif %}</td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table></div>
+        <div class="legend-row">
+            {{ m.legend_block("Origin", LABEL_GLOSSARY["Origin"]) }}
+            {{ m.legend_block("Kind", LABEL_GLOSSARY["Kind"]) }}
+        </div>
+        {% else %}<p class="text-muted">No candidate screened.</p>{% endif %}
+    </div>
+</section>
+
+<section class="panel">
+    <div class="panel-header"><h3>Declared lineage</h3><span class="text-muted">from model metadata, not verified</span></div>
+    <div class="panel-body">
+        {% if data.declared %}
+        <div class="table-scroll"><table class="data-table">
+            <thead><tr><th>Child</th><th>Relation</th><th>Parent</th></tr></thead>
+            <tbody>{% for link in data.declared %}<tr><td class="name">{{ link.child }}</td><td><span class="tag">{{ link.relation }}</span></td><td class="name">{{ link.parent }}</td></tr>{% endfor %}</tbody>
+        </table></div>
+        {% else %}<p class="text-muted">No lineage declared.</p>{% endif %}
+    </div>
+</section>
+
+{% if data.skipped %}
+<details class="panel-collapse">
+    <summary class="panel-collapse-head">Skipped candidates <span class="tag">{{ data.skipped|length }}</span></summary>
+    <div class="details-body">
+        <div class="table-scroll"><table class="data-table">
+            <thead><tr><th>Candidate</th><th>Origin</th><th>Reason</th></tr></thead>
+            <tbody>{% for row in data.skipped %}<tr><td class="name">{{ row.ref }}</td><td><span class="tag" title="{{ row.origin }}">{{ row.origin|origin_abbr }}</span></td><td>{{ row.reason }}</td></tr>{% endfor %}</tbody>
+        </table></div>
+        <div class="legend-row">{{ m.legend_block("Origin", LABEL_GLOSSARY["Origin"]) }}</div>
+    </div>
+</details>
+{% endif %}
+
+{% for deep in data.deep or [] %}
+<hr class="section-sep">
+{{ deep_comparison(deep, deep.ref == data.best) }}
+{% endfor %}
+{% endmacro %}
+
+{% macro deep_comparison(deep, is_best=false) %}
+<h2>Deep comparison: <span class="key-id">{{ deep.ref }}</span> <span class="tag">{{ deep.origin }}</span></h2>
+{% if deep.error %}
+{{ m.error_banner(deep.error) }}
+{% else %}
+{% if deep.verdict %}<div class="verdict {{ deep.rank|verdict_class }}">{{ deep.verdict }}<span class="verdict-detail">rank {{ deep.rank }}</span></div>{% endif %}
+{% set summary = deep.summary or {} %}
+<div class="stats-grid">
+    {{ m.stat_card("Raw cos median", summary.raw_med|num, mark=("decision" if is_best else none)) }}
+    {{ m.stat_card("Max rel distance", summary.max_rel_d|num) }}
+    {{ m.stat_card("Circuits r", summary.inv_mean|num, "mean of the verdict circuits") }}
+    {{ m.stat_card("Circuits z min", summary.inv_zmin|num(3)) }}
+    {{ m.stat_card("Neurons nn_row", summary.nn|num) }}
+    {{ m.stat_card("Neurons z", summary.nn_z|num(3)) }}
+</div>
+{% for layer in deep.layers or [] %}
+<section class="panel">
+    <div class="panel-header">
+        <h3>Layer {{ layer.layer }}</h3>
+        <span class="text-muted">input norm r <span class="mono">{{ layer.input_norm_r|num }}</span> · post-attention norm r <span class="mono">{{ layer.post_attention_norm_r|num }}</span></span>
+    </div>
+    <div class="panel-body">
+        <div class="table-scroll"><table class="data-table">
+            <thead><tr><th>Tensor</th><th class="num">Raw cos</th><th class="num">Raw null</th><th class="num">Rel d</th><th class="num">nn_row</th><th class="num">nn null</th><th class="num">nn z</th><th class="num">Spectrum</th><th>Note</th></tr></thead>
+            <tbody>
+            {% for row in layer.tensors or [] %}
+            <tr>
+                <td class="mono" title="{{ row.kind }}">{{ row.kind|module_abbr }}</td>
+                <td class="num">{{ row.raw_cos|num }}</td>
+                <td class="num">{{ row.raw_null|num }}</td>
+                <td class="num">{{ row.rel_d|num }}</td>
+                <td class="num">{{ row.nn_row|num }}</td>
+                <td class="num">{{ row.nn_null|num }}</td>
+                <td class="num">{{ row.nn_z|num(3) }}</td>
+                <td class="num">{{ row.spectrum|num }}</td>
+                <td>{{ row.note or "" }}</td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table></div>
+        {% if loop.first %}<div class="legend-row">{{ m.legend_block("Tensor", LABEL_GLOSSARY["Module"]) }}</div>{% endif %}
+    </div>
+</section>
+{% endfor %}
+<section class="panel">
+    <div class="panel-header"><h3>Embeddings</h3></div>
+    <div class="panel-body">
+        {% if deep.embeddings %}
+        {% set e = deep.embeddings %}
+        <p class="hint">rows <span class="mono">{{ e.start }}</span> to <span class="mono">{{ e.start + e.rows - 1 }}</span></p>
+        {{ m.kv_table({"raw cos": e.raw_cos, "raw null": e.raw_null, "rel d": e.rel_d}) }}
+        {% else %}<p class="text-muted">Not compared.</p>{% endif %}
+    </div>
+</section>
+<section class="panel">
+    <div class="panel-header"><h3>Token circuits</h3><span class="text-muted">Pearson r vs token-permuted nulls</span></div>
+    <div class="panel-body">
+        {% if deep.circuits %}
+        <div class="table-scroll"><table class="data-table">
+            <thead><tr><th>Circuit</th><th class="num">r</th><th class="num">Null mean</th><th class="num">Null sd</th><th class="num">z</th><th>Verdict</th></tr></thead>
+            <tbody>
+            {% for circuit in deep.circuits %}
+            <tr>
+                <td class="mono" title="{{ circuit.name }}">{{ circuit.name|circuit_abbr }}</td>
+                <td class="num">{{ circuit.r|num }}</td>
+                <td class="num">{{ circuit.null_mean|num }}</td>
+                <td class="num">{{ circuit.null_sd|num }}</td>
+                <td class="num">{{ circuit.z|num(3) }}</td>
+                <td>{{ m.flag(circuit.in_verdict, "counted", "excluded", "badge-info", "badge-neutral") }}</td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table></div>
+        <div class="legend-row">{{ m.legend_block("Circuit", LABEL_GLOSSARY["Circuit"]) }}</div>
+        {% else %}<p class="text-muted">Not computed.</p>{% endif %}
+    </div>
+</section>
+{{ m.message_panel("Comparison notes", deep.notes) }}
+{% endif %}
+{% endmacro %}

@@ -1,0 +1,18 @@
+# Runtime dependencies.
+#
+# torch is deliberately absent: install it first from the wheel index matching
+# your hardware, then the rest of this file.
+#   CPU:  pip install torch --index-url https://download.pytorch.org/whl/cpu
+#   CUDA: see https://pytorch.org/get-started/locally/
+
+safetensors>=0.4
+numpy>=1.26
+huggingface_hub>=0.30
+transformers>=4.51     # tokenizers (Token Shifts, Lineage) and models (Behaviour Probe)
+peft>=0.15             # LoRA adapters in the Behaviour Probe
+gguf>=0.10             # GGUF reading and dequantization
+jinja2>=3.1            # HTML reports and web templates
+
+rich>=13.9             # interactive CLI
+prompt_toolkit>=3.0
+flask>=3.0             # web interface

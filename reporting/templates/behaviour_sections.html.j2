@@ -1,0 +1,182 @@
+{# The sections of a behaviour result (BehaviourResult), shared by the behaviour and assessment reports. #}
+{% import "macros.html.j2" as m %}
+
+{% macro behaviour_sections(data) %}
+{% set placement = data.placement or {} %}
+{% set control = data.control %}
+{% set prompts = data.prompts or [] %}
+<section class="panel">
+    <div class="panel-header">
+        <h3>Placement</h3>
+        {% if data.same_vocab %}<span class="badge badge-success">same vocabulary</span>
+        {% else %}<span class="badge badge-warning">different vocabularies: generations only</span>{% endif %}
+    </div>
+    <div class="panel-body">
+        {{ m.kv_table({"tuned model": placement.tuned_device, "base model": placement.base_device or "the tuned model with its adapter disabled", "reason": placement.reason}) }}
+    </div>
+</section>
+
+<div class="stats-grid">
+    {{ m.stat_card("Mean KL", data.mean_kl|num, "KL(tuned ‖ base), mean of the prompts") }}
+    {{ m.stat_card("Max KL", data.max_kl|num) }}
+    {{ m.stat_card("Positions", data.positions|num) }}
+    {{ m.stat_card("Control z", control.z|num(3) if control else MISSING, "against neutral prompts") }}
+    {{ m.stat_card("Prompts", prompts|length) }}
+</div>
+
+<section class="panel">
+    <div class="panel-header"><h3>Against control prompts</h3></div>
+    <div class="panel-body">
+        {% if control %}
+        <p class="hint">Neutral everyday prompts go through the same comparison; their per-prompt mean KLs are the null
+            distribution. A large z means the probed prompts move more than everyday text (a targeted change);
+            a z near 0 means they move no more than neutral prompts (a uniform drift, or no targeted change).</p>
+        {{ m.null_comparison(control, "target mean KL") }}
+        {% if data.control_kl %}
+        <div class="section-label" style="margin-top: 12px">Control prompts mean KL</div>
+        <div class="chip-list">{% for value in data.control_kl %}<span class="tag mono">{{ value|num }}</span>{% endfor %}</div>
+        {% endif %}
+        {% else %}
+        <p class="text-muted">No control comparison (no control prompt, or no usable result).</p>
+        {% endif %}
+    </div>
+</section>
+
+{% if prompts %}
+<section class="panel">
+    <div class="panel-header"><h3>Prompts</h3><span class="text-muted">mean and max KL over each prompt's positions</span></div>
+    <div class="panel-body">
+        {% set top = prompts|map(attribute="mean_kl")|peak %}
+        <div class="table-scroll"><table class="data-table">
+            <thead><tr><th class="num">#</th><th>Prompt</th><th class="num">Positions</th><th class="num">Mean KL</th><th></th><th class="num">Max KL</th></tr></thead>
+            <tbody>
+            {% for prompt in prompts %}
+            <tr>
+                <td class="num">{{ prompt.prompt }}</td>
+                <td class="wide" title="{{ prompt.text }}">{{ prompt.text|truncate(120, true) }}</td>
+                <td class="num">{{ prompt.positions|num }}</td>
+                <td class="num">{{ prompt.mean_kl|num }}</td>
+                <td class="bar-cell">{{ m.bar(prompt.mean_kl, top) }}</td>
+                <td class="num">{{ prompt.max_kl|num }}</td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table></div>
+    </div>
+</section>
+{% endif %}
+
+{% if data.hottest %}
+<section class="panel">
+    <div class="panel-header"><h3>Hottest positions</h3><span class="text-muted">largest KL over every prompt</span></div>
+    <div class="panel-body">{{ hot_table(data.hottest) }}</div>
+</section>
+{% endif %}
+
+{% if data.promoted or data.suppressed %}
+<div class="two-col">
+    <section class="panel">
+        <div class="panel-header"><h3>Promoted tokens</h3><span class="text-muted">mean log p_tuned − log p_base</span></div>
+        <div class="panel-body">{{ m.token_chips(data.promoted, "shift") }}</div>
+    </section>
+    <section class="panel">
+        <div class="panel-header"><h3>Suppressed tokens</h3><span class="text-muted">mean log p_tuned − log p_base</span></div>
+        <div class="panel-body">{{ m.token_chips(data.suppressed, "shift") }}</div>
+    </section>
+</div>
+{% endif %}
+
+{% if data.layer_drift %}
+<section class="panel">
+    <div class="panel-header"><h3>Hidden-state drift</h3><span class="text-muted">mean 1 − cos(h_base, h_tuned) per layer</span></div>
+    <div class="panel-body">{{ drift(data.layer_drift) }}</div>
+</section>
+{% endif %}
+
+{% if prompts %}
+<section class="panel">
+    <div class="panel-header"><h3>Per prompt</h3><span class="text-muted">next-token predictions after the prompt, and token shifts</span></div>
+    <div class="panel-body">
+        {% for prompt in prompts %}
+        <details>
+            <summary><span class="mono">{{ prompt.prompt }}.</span> {{ prompt.text|truncate(100, true) }} · mean KL <span class="mono">{{ prompt.mean_kl|num }}</span></summary>
+            <div class="details-body">
+                <div class="output-block">{{ prompt.text }}</div>
+                <div class="two-col" style="margin-top: 12px">
+                    {{ next_tokens("Base next tokens", prompt.next_base) }}
+                    {{ next_tokens("Tuned next tokens", prompt.next_tuned) }}
+                </div>
+                <div class="two-col" style="margin-top: 12px">
+                    <div><div class="section-label">Promoted</div>{{ m.token_chips(prompt.promoted, "shift") }}</div>
+                    <div><div class="section-label">Suppressed</div>{{ m.token_chips(prompt.suppressed, "shift") }}</div>
+                </div>
+                {% if prompt.hottest %}<h4>Hottest positions</h4>{{ hot_table(prompt.hottest) }}{% endif %}
+            </div>
+        </details>
+        {% endfor %}
+    </div>
+</section>
+{% endif %}
+
+{% if data.generations %}
+<section class="panel">
+    <div class="panel-header"><h3>Generations</h3><span class="text-muted">greedy continuations</span></div>
+    <div class="panel-body">
+        {% for generation in data.generations %}
+        <div class="section-label">Prompt {{ generation.prompt }}</div>
+        <div class="output-block" style="margin-bottom: 8px">{{ generation.text }}</div>
+        <div class="two-col" style="margin-bottom: 20px">
+            <div><div class="section-label">Base</div><div class="output-block">{{ generation.base }}</div></div>
+            <div><div class="section-label">Tuned</div><div class="output-block">{{ generation.tuned }}</div></div>
+        </div>
+        {% endfor %}
+    </div>
+</section>
+{% endif %}
+
+{% if data.errors %}
+<section class="panel danger">
+    <div class="panel-header"><h3>Errors</h3><span class="tag">{{ data.errors|length }}</span></div>
+    <div class="panel-body">
+        <div class="table-scroll"><table class="data-table">
+            <thead><tr><th class="num">Prompt</th><th>Kind</th><th>Message</th></tr></thead>
+            <tbody>{% for error in data.errors %}<tr><td class="num">{{ error.prompt }}</td><td><span class="tag">{{ error.kind }}</span></td><td class="mono">{{ error.message }}</td></tr>{% endfor %}</tbody>
+        </table></div>
+    </div>
+</section>
+{% endif %}
+{% endmacro %}
+
+{% macro hot_table(rows) %}
+<div class="table-scroll"><table class="data-table">
+    <thead><tr><th class="num">Prompt</th><th class="num">Position</th><th class="num nowrap">KL</th><th>Context</th><th>Base → tuned</th></tr></thead>
+    <tbody>
+    {% for hot in rows %}
+    <tr>
+        <td class="num">{{ hot.prompt }}</td>
+        <td class="num">{{ hot.position }}</td>
+        <td class="num nowrap">{{ hot.kl|num }}</td>
+        <td class="wide">{{ hot.context|token }}</td>
+        <td>{{ hot.base_token|token }} → {{ hot.tuned_token|token }}</td>
+    </tr>
+    {% endfor %}
+    </tbody>
+</table></div>
+{% endmacro %}
+
+{% macro next_tokens(label, tokens) %}
+<div>
+    <div class="section-label">{{ label }}</div>
+    {% if tokens %}
+    <div class="table-scroll"><table class="data-table">
+        <tbody>{% for item in tokens %}<tr><td>{{ item.text|token }}</td><td class="num">{{ item.probability|pct }}</td></tr>{% endfor %}</tbody>
+    </table></div>
+    {% else %}<p class="text-muted">None.</p>{% endif %}
+</div>
+{% endmacro %}
+
+{% macro drift(values) %}
+{% set rows = [] %}
+{% for value in values %}{% set _ = rows.append(("emb" if loop.first else "L" ~ (loop.index0 - 1), value)) %}{% endfor %}
+{{ m.bar_list(rows) }}
+{% endmacro %}

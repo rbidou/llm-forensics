@@ -1,0 +1,59 @@
+{% extends "app/base.html" %}
+{% import "app/macros.html" as m with context %}
+{% set active_page = 'vocabulary' %}
+{% block title %}LLM Forensics - Vocabulary & Embeddings{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2>Vocabulary &amp; Embeddings</h2>
+    <p>The tokenizer diff and how the token embeddings moved: added, removed or reassigned tokens, the shared-row shift, and each new token read as trained or placeholder, emittable or read-only</p>
+</div>
+
+{{ m.feature_banner('vocab') }}
+
+<!-- 1. INPUT -->
+<div class="panel" id="input-panel">
+    <div class="panel-header">
+        <h3>Input</h3>
+        <button class="panel-toggle" type="button" aria-expanded="true" aria-controls="input-body"
+                data-panel-name="the input" aria-label="Collapse the input">
+            <span class="panel-toggle-chevron" aria-hidden="true">&rsaquo;</span>
+        </button>
+    </div>
+    <div class="panel-body" id="input-body">
+        {{ m.model_picker('base', 'Base model', 'The reference model and its tokenizer.') }}
+        {{ m.model_picker('tuned', 'Tuned model', 'Full or merged weights, a LoRA adapter or checkpoint, GGUF or bitsandbytes.') }}
+        <div class="form-grid">
+            <div class="form-group">
+                <label for="rows-input">Moved rows listed</label>
+                <input type="number" class="form-control form-control-mono" id="rows-input" value="20" min="1" max="200">
+                <p class="field-description">The shared token rows that moved most, per embedding matrix, 1 to 200.</p>
+            </div>
+            <div class="form-group">
+                <label for="new-input">New tokens read</label>
+                <input type="number" class="form-control form-control-mono" id="new-input" value="50" min="1" max="1000">
+                <p class="field-description">Added tokens characterised (trained vs placeholder, emittable vs read-only), 1 to 1000.</p>
+            </div>
+        </div>
+        <div class="button-row">
+            {{ m.run_button('vocab', 'Compare vocabulary') }}
+        </div>
+    </div>
+</div>
+
+{{ m.job_sections('Comparing vocabulary and embeddings') }}
+
+<!-- 4. RESULTS: the risk summary only; every detail is in the saved report. -->
+<div id="results-section" style="display: none;">
+    <div class="button-row" id="result-actions"></div>
+
+    <h2 class="group-title">Summary</h2>
+    <div id="results-verdict" class="verdict"></div>
+    <ul class="message-list" id="summary-lines" style="display: none;"></ul>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/model-picker.js') }}"></script>
+<script src="{{ url_for('static', filename='js/vocab.js') }}"></script>
+{% endblock %}

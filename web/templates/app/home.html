@@ -1,0 +1,166 @@
+{% extends "app/base.html" %}
+{% import "app/macros.html" as m with context %}
+{% set active_page = 'home' %}
+{% block title %}LLM Forensics - Analyse a model{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2>Analyse a model</h2>
+    <p>Run the full workflow on a model and get a suspicion verdict: its source is established (given, or
+       discovered with Provenance), the weight tools compare it against that source, and every reading is
+       judged against its own baseline. The report is saved under Reports &rsaquo; Analysis.</p>
+</div>
+
+{{ m.feature_banner('assessment') }}
+
+<!-- 1. INPUT -->
+<div class="panel" id="model-panel">
+    <div class="panel-header">
+        <h3>Model</h3>
+        <button class="panel-toggle" type="button" aria-expanded="true" aria-controls="model-body"
+                data-panel-name="the model inputs" aria-label="Collapse the model inputs">
+            <span class="panel-toggle-chevron" aria-hidden="true">&rsaquo;</span>
+        </button>
+    </div>
+    <div class="panel-body" id="model-body">
+        {{ m.model_picker('suspect', 'Model to analyse', 'Full or merged weights, a LoRA adapter or checkpoint, GGUF or bitsandbytes.') }}
+        {{ m.model_picker('source', 'Source model (optional)', 'The model it is claimed to derive from. Leave empty to discover the source with Provenance.') }}
+    </div>
+</div>
+
+<!-- 1a. OPTIONS -->
+<div class="panel" id="workflow-panel">
+    <div class="panel-header">
+        <h3>Workflow</h3>
+        <button class="panel-toggle" type="button" aria-expanded="true" aria-controls="workflow-body"
+                data-panel-name="the workflow parameters" aria-label="Collapse the workflow parameters">
+            <span class="panel-toggle-chevron" aria-hidden="true">&rsaquo;</span>
+        </button>
+    </div>
+    <div class="panel-body" id="workflow-body">
+        <label class="toggle-row">
+            <span class="toggle-switch">
+                <input type="checkbox" id="opt-verify" checked>
+                <span class="toggle-slider"></span>
+            </span>
+            <span class="toggle-label">Verify a given source with Provenance (flag a claim the weights do not support)</span>
+        </label>
+        <label class="toggle-row">
+            <span class="toggle-switch">
+                <input type="checkbox" id="opt-search" checked>
+                <span class="toggle-slider"></span>
+            </span>
+            <span class="toggle-label">Search the Hub for the source when none is given</span>
+        </label>
+        <p class="field-description" style="margin-top: 16px;">Analyses to run. The ones relevant for the model's
+            format are pre-selected when you detect it; turn any on or off to override.</p>
+        <label class="toggle-row">
+            <span class="toggle-switch">
+                <input type="checkbox" id="opt-weights" checked>
+                <span class="toggle-slider"></span>
+            </span>
+            <span class="toggle-label">Run the Weight Diff</span>
+        </label>
+        <label class="toggle-row">
+            <span class="toggle-switch">
+                <input type="checkbox" id="opt-entropy">
+                <span class="toggle-slider"></span>
+            </span>
+            <span class="toggle-label">Run the Entropy Analysis</span>
+        </label>
+        <label class="toggle-row">
+            <span class="toggle-switch">
+                <input type="checkbox" id="opt-shifts" checked>
+                <span class="toggle-slider"></span>
+            </span>
+            <span class="toggle-label">Run the Token Shifts</span>
+        </label>
+        <label class="toggle-row">
+            <span class="toggle-switch">
+                <input type="checkbox" id="opt-vocab" checked>
+                <span class="toggle-slider"></span>
+            </span>
+            <span class="toggle-label">Run the Vocabulary &amp; Embeddings analysis</span>
+        </label>
+        <label class="toggle-row">
+            <span class="toggle-switch">
+                <input type="checkbox" id="opt-behaviour">
+                <span class="toggle-slider"></span>
+            </span>
+            <span class="toggle-label">Run the Behaviour Probe (loads both models; needs a GPU)</span>
+        </label>
+        <div class="form-group" id="behaviour-prompts-group" style="display: none;">
+            <label for="opt-prompts">Behaviour prompts</label>
+            <p class="field-description">One prompt per line: the inputs to test. They are compared against built-in
+                neutral control prompts. Leave empty to skip the targeted comparison.</p>
+            <textarea class="form-control form-control-mono" id="opt-prompts" rows="4"></textarea>
+        </div>
+
+        <details class="advanced">
+            <summary>Advanced options</summary>
+            <div class="form-grid" style="margin-top: 16px;">
+                <div class="form-group">
+                    <label for="opt-entropy-layers">Entropy: last blocks</label>
+                    <input type="number" class="form-control form-control-mono" id="opt-entropy-layers" value="2" min="1" max="64">
+                </div>
+                <div class="form-group">
+                    <label for="opt-entropy-bins">Entropy: histogram bins</label>
+                    <input type="number" class="form-control form-control-mono" id="opt-entropy-bins" value="64" min="2" max="256">
+                </div>
+                <div class="form-group">
+                    <label for="opt-updates">Token Shifts: updates</label>
+                    <input type="number" class="form-control form-control-mono" id="opt-updates" value="10" min="1" max="200">
+                </div>
+                <div class="form-group">
+                    <label for="opt-tokens">Token Shifts: tokens</label>
+                    <input type="number" class="form-control form-control-mono" id="opt-tokens" value="15" min="1" max="100">
+                </div>
+                <div class="form-group">
+                    <label for="opt-layers">Provenance: layers</label>
+                    <input type="number" class="form-control form-control-mono" id="opt-layers" value="1" min="1" max="64">
+                </div>
+                <div class="form-group">
+                    <label for="opt-top-k">Provenance: candidates compared</label>
+                    <input type="number" class="form-control form-control-mono" id="opt-top-k" value="3" min="1" max="40">
+                </div>
+                <div class="form-group">
+                    <label for="opt-generate">Behaviour: tokens generated</label>
+                    <input type="number" class="form-control form-control-mono" id="opt-generate" value="0" min="0" max="1024">
+                </div>
+            </div>
+            <div class="form-group" style="margin-bottom: 0;">
+                <label for="opt-candidates">Provenance candidates (optional)</label>
+                <p class="field-description">One reference per line: explicit parents to compare, besides any Hub search.</p>
+                <textarea class="form-control form-control-mono" id="opt-candidates" rows="3"></textarea>
+            </div>
+        </details>
+
+        <div class="button-row">
+            {{ m.run_button('assessment', 'Run analysis') }}
+        </div>
+    </div>
+</div>
+
+{{ m.job_sections('Analysing the model', show_steps=True) }}
+
+<!-- 4. RESULTS: the executive summary only, laid out as in the saved report. -->
+<div id="results-section" style="display: none;">
+    <div class="button-row" id="result-actions"></div>
+
+    <h2 class="group-title">Executive Summary</h2>
+    <div id="verdict-banner" class="verdict"></div>
+
+    <div class="panel">
+        <div class="panel-body">
+            <table class="data-table exec-table" style="margin-bottom: 0;">
+                <tbody id="exec-body"></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/model-picker.js') }}"></script>
+<script src="{{ url_for('static', filename='js/home.js') }}"></script>
+{% endblock %}

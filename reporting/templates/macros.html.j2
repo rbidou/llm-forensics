@@ -1,0 +1,139 @@
+{# Repeated pieces of every report. Imported with: {% import "macros.html.j2" as m %} #}
+
+{# A metric card. `risk` (a severity) tags it in the risk colour; `mark` tags it in the accent colour
+   (e.g. the card that drives a decision). Either tag lights the card's edge in the accent orange. #}
+{% macro stat_card(label, value, note=None, risk=None, mark=None) %}
+{% set graded = risk and risk != "none" %}
+<div class="stat-card{% if graded or mark %} stat-lit{% endif %}">
+    <div class="stat-label">{{ label }}
+        {% if graded %}<span class="badge {{ risk|severity_badge }} stat-tag">{{ risk }}</span>{% endif %}
+        {% if mark %}<span class="badge badge-accent stat-tag">{{ mark }}</span>{% endif %}
+    </div>
+    <div class="stat-value">{{ value }}</div>
+    {% if note %}<div class="stat-note">{{ note }}</div>{% endif %}
+</div>
+{% endmacro %}
+
+{# A compact definition list for a table legend; items is a list of (label, meaning) pairs. #}
+{% macro legend_block(title, items) %}
+<dl class="legend">
+    <dt class="legend-title">{{ title }}</dt>
+    {% for label, meaning in items %}
+    <dd><span class="legend-key">{{ label }}</span> {{ meaning }}</dd>
+    {% endfor %}
+</dl>
+{% endmacro %}
+
+{# The Type / Module / Role legend shared by the tensor tables (weights, entropy, token shifts). #}
+{% macro tensor_legend() %}
+<div class="legend-row">
+    {{ legend_block("Type", LABEL_GLOSSARY["Type"]) }}
+    {{ legend_block("Module", LABEL_GLOSSARY["Module"]) }}
+    {{ legend_block("Role", LABEL_GLOSSARY["Role"]) }}
+</div>
+{% endmacro %}
+
+{% macro bar(value, maximum) %}
+<div class="bar-track"><div class="bar-fill" style="width: {{ value|bar(maximum) }}%"></div></div>
+{% endmacro %}
+
+{# rows: list of (label, value) pairs; one bar per row, scaled to the largest value #}
+{% macro bar_list(rows) %}
+{% set top = rows|map(attribute=1)|peak %}
+<div class="bar-list">
+    {% for label, value in rows %}
+    <span class="bar-label">{{ label }}</span>
+    {{ bar(value, top) }}
+    <span class="bar-value">{{ value|num }}</span>
+    {% endfor %}
+</div>
+{% endmacro %}
+
+{% macro flag(value, yes="yes", no="no", yes_class="badge-success", no_class="badge-neutral") %}
+{% if value is none %}<span class="text-muted">{{ MISSING }}</span>
+{% elif value %}<span class="badge {{ yes_class }}">{{ yes }}</span>
+{% else %}<span class="badge {{ no_class }}">{{ no }}</span>{% endif %}
+{% endmacro %}
+
+{% macro beyond_noise(value) %}{{ flag(value, "beyond noise", "within noise", "badge-accent", "badge-neutral") }}{% endmacro %}
+
+{# A score against its null distribution (stats.NullComparison) #}
+{% macro null_comparison(null, label="mean") %}
+{% if null %}
+<div class="null-line">
+    {{ label }} <span class="mono">{{ null.value|num }}</span>
+    · null <span class="mono">{{ null.null_mean|num }} ± {{ null.null_sd|num }}</span>
+    · z <span class="mono">{{ null.z|num(3) }}</span>
+    {% if null.z is number and null.z >= Z_NOTABLE %}<span class="badge badge-accent">above null</span>
+    {% else %}<span class="badge badge-neutral">near null</span>{% endif %}
+</div>
+{% endif %}
+{% endmacro %}
+
+{# tokens: list of dicts with "text" and the score key #}
+{% macro token_chips(tokens, score_key="score", score_format="num") %}
+{% if tokens %}
+<div class="chip-list">
+    {% for item in tokens %}
+    <span class="chip">{{ item.text|token }}<span class="score">{% if score_format == "pct" %}{{ item[score_key]|pct }}{% else %}{{ item[score_key]|num(3) }}{% endif %}</span></span>
+    {% endfor %}
+</div>
+{% else %}
+<p class="text-muted">None.</p>
+{% endif %}
+{% endmacro %}
+
+{% macro message_panel(title, messages, kind="") %}
+{% if messages %}
+<section class="panel {{ kind }}">
+    <div class="panel-header"><h3>{{ title }}</h3><span class="tag">{{ messages|length }}</span></div>
+    <div class="panel-body">
+        <ul class="message-list">
+            {% for message in messages %}<li>{{ message }}</li>{% endfor %}
+        </ul>
+    </div>
+</section>
+{% endif %}
+{% endmacro %}
+
+{% macro kv_rows(items) %}
+<div class="table-scroll">
+    <table class="data-table kv-table">
+        <tbody>
+            {% for key, value in items %}
+            <tr><th>{{ key }}</th><td>{{ value|value_text }}</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endmacro %}
+
+{% macro kv_table(mapping) %}
+{{ kv_rows(mapping|dictsort) }}
+{% endmacro %}
+
+{# The same key/value pairs as two tables side by side (the first takes the extra item on an odd count). #}
+{% macro kv_table_pair(mapping) %}
+{% set items = mapping|dictsort %}
+{% set half = (items|length + 1) // 2 %}
+<div class="two-col">
+    {{ kv_rows(items[:half]) }}
+    {% if items[half:] %}{{ kv_rows(items[half:]) }}{% endif %}
+</div>
+{% endmacro %}
+
+{# A tool report's sources: one input per line, each value kept on a single scrollable line. #}
+{% macro source_lines(mapping) %}
+<div class="source-list">
+    {% for key, value in mapping|dictsort %}
+    <div class="source-row">
+        <span class="source-key">{{ key }}</span>
+        <div class="source-val">{{ value|value_text }}</div>
+    </div>
+    {% endfor %}
+</div>
+{% endmacro %}
+
+{% macro error_banner(message) %}
+<div class="verdict bad">Failed<span class="verdict-detail mono">{{ message }}</span></div>
+{% endmacro %}

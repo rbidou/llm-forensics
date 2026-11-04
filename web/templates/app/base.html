@@ -1,0 +1,130 @@
+{#- The menu, defined once: it builds both the sidebar and the breadcrumb of the compact
+    layout's top bar, so the two can never disagree. A group with a 'title' prints a section
+    heading above its items; one with 'separator' prints a divider above it. 'Tools' and
+    'System' are labels only: the items they hold are the links. -#}
+{%- set groups = [
+    {'items': [
+        {'slug': 'home', 'endpoint': 'forensics_home', 'label': 'Model Analysis', 'icon': '◎'},
+    ]},
+    {'title': 'Tools', 'items': [
+        {'slug': 'weight-diff', 'endpoint': 'forensics_weights', 'label': 'Weight Diff', 'icon': '▲'},
+        {'slug': 'entropy', 'endpoint': 'forensics_entropy', 'label': 'Entropy Analysis', 'icon': '≈'},
+        {'slug': 'token-shifts', 'endpoint': 'forensics_shifts', 'label': 'Token Shifts', 'icon': '★'},
+        {'slug': 'vocabulary', 'endpoint': 'forensics_vocab', 'label': 'Vocabulary & Embeddings', 'icon': '✦'},
+        {'slug': 'hub-lineage', 'endpoint': 'forensics_lineage', 'label': 'Hub Lineage', 'icon': '☰'},
+        {'slug': 'provenance', 'endpoint': 'forensics_provenance', 'label': 'Provenance', 'icon': '◉'},
+        {'slug': 'behaviour-probe', 'endpoint': 'forensics_behaviour', 'label': 'Behaviour Probe', 'icon': '▶'},
+    ]},
+    {'title': 'Reports', 'separator': True, 'items': [
+        {'slug': 'reports', 'endpoint': 'forensics_reports', 'label': 'Tools'},
+        {'slug': 'analysis', 'endpoint': 'forensics_analysis', 'label': 'Analysis'},
+    ]},
+    {'title': 'System', 'separator': True, 'items': [
+        {'slug': 'environment', 'endpoint': 'forensics_environment', 'label': 'Environment', 'icon': '⚙'},
+        {'slug': 'setup', 'endpoint': 'forensics_setup', 'label': 'Settings', 'icon': '🔧'},
+    ]},
+    {'separator': True, 'items': [
+        {'slug': 'documentation', 'endpoint': 'forensics_documentation', 'label': 'Documentation', 'icon': '✎'},
+    ]},
+] -%}
+{#- Breadcrumb of the compact layout: the current page's label, found by a flat scan of the leaves. -#}
+{%- set crumb = namespace(text='') -%}
+{%- for group in groups -%}
+    {%- for item in group['items'] if item.slug == active_page -%}
+        {%- set crumb.text = item.label -%}
+    {%- endfor -%}
+{%- endfor -%}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}LLM Forensics{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
+    {% block head %}{% endblock %}
+</head>
+<body>
+    {# The brand points at this application's own home page: LLM Forensics is a
+       self-contained console, with no parent site to open in a second tab. #}
+    <!-- Compact layout (< 1400px): top bar with the menu toggle; the sidebar becomes a drawer -->
+    <header class="topbar">
+        <button type="button" class="topbar-toggle" id="nav-toggle" aria-controls="sidebar"
+                aria-expanded="false" aria-label="Open the menu" title="Menu">&#9776;</button>
+        <span class="topbar-brand">LLM Forensics</span>
+        <span class="topbar-crumb">{{ crumb.text }}</span>
+    </header>
+    <div class="nav-backdrop" id="nav-backdrop"></div>
+
+    <nav class="sidebar" id="sidebar">
+        <div class="sidebar-brand">
+            <h1><a href="{{ url_for('forensics_home') }}">LLM Forensics</a></h1>
+            <div class="subtitle">Model forensics toolkit</div>
+        </div>
+
+        <div class="sidebar-nav">
+            {%- for group in groups %}
+            {%- if group.separator %}<div class="nav-sep" role="separator"></div>{% endif %}
+            {%- if group.title %}
+            {#- A titled group ('Tools', 'System') is collapsible: the header toggles its items.
+                The group holding the current page is opened here, so it never flashes shut. -#}
+            {%- set section = namespace(active=false) -%}
+            {%- for item in group['items'] if item.slug == active_page %}{% set section.active = true %}{% endfor -%}
+            <div class="nav-category{% if section.active %} open{% endif %}">
+                <button type="button" class="nav-category-header" aria-expanded="{{ 'true' if section.active else 'false' }}">
+                    <span>{{ group.title }}</span>
+                    <span class="chevron" aria-hidden="true">&#9654;</span>
+                </button>
+                <div class="nav-category-items">
+                    {%- for item in group['items'] %}
+                    {#- Submenu leaves wear a bullet, not an icon: the icons mark the top-level links. -#}
+                    <a href="{{ url_for(item.endpoint) }}"
+                       class="{% if active_page == item.slug %}active{% endif %}">
+                        <span class="item-dot" aria-hidden="true"></span>
+                        <span class="nav-label">{{ item.label }}</span>
+                    </a>
+                    {%- endfor %}
+                </div>
+            </div>
+            {%- else %}
+            {%- for item in group['items'] %}
+            <a href="{{ url_for(item.endpoint) }}"
+               class="{% if active_page == item.slug %}active{% endif %}">
+                <span class="nav-icon">{{ item.icon }}</span>
+                <span class="nav-label">{{ item.label }}</span>
+            </a>
+            {%- endfor %}
+            {%- endif %}
+            {%- endfor %}
+        </div>
+
+        <div class="sidebar-footer">
+            <div class="sidebar-footer-sep" role="separator"></div>
+            {#- Live system readout, filled by app.js (status from the job watcher, the rest polled). -#}
+            <div class="sidebar-system">
+                <div class="system-status">
+                    <span class="status-dot" id="system-status-chip"></span>
+                    <span class="system-status-label" id="system-status-label">&mdash;</span>
+                </div>
+                <dl class="system-info">
+                    <div class="system-row"><dt>Address</dt><dd id="system-ip">&mdash;</dd></div>
+                    <div class="system-row"><dt>RAM</dt><dd id="system-ram">&mdash;</dd></div>
+                    <div class="system-row"><dt>GPU</dt><dd id="system-gpu">&mdash;</dd></div>
+                    <div class="system-row"><dt>VRAM</dt><dd id="system-vram">&mdash;</dd></div>
+                </dl>
+            </div>
+            <div class="sidebar-footer-sep" role="separator"></div>
+            <div class="sidebar-copyright">
+                LLM Forensics {{ version }}<br>
+                &copy; 2026 LLM Forensics
+            </div>
+        </div>
+    </nav>
+
+    <main class="main-content">
+        {% block content %}{% endblock %}
+    </main>
+
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

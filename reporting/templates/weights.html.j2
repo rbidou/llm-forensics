@@ -1,0 +1,5 @@
+{% extends "base.html.j2" %}
+{% from "weights_sections.html.j2" import weights_sections %}
+{% block content %}
+{{ weights_sections(data) }}
+{% endblock %}

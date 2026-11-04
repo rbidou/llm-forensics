@@ -1,0 +1,73 @@
+{% extends "app/base.html" %}
+{% set active_page = 'environment' %}
+{% block title %}LLM Forensics - Environment{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2>Environment</h2>
+    <p>What this machine can do: platform, interpreter, GPU, packages and the features they enable (the same report as
+       <span class="text-mono">python run.py check</span>)</p>
+</div>
+
+<!-- 2. LOADING -->
+<div id="loading-section" style="display: none;">
+    <div class="loading-overlay">
+        <span class="spinner"></span> Observing the machine...
+    </div>
+</div>
+
+<!-- 3. ERROR -->
+<div id="error-section" style="display: none;">
+    <div class="panel">
+        <div class="panel-body">
+            <div class="empty-state">
+                <p id="error-message" style="color: var(--danger);"></p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 4. RESULTS -->
+<div id="results-section" style="display: none;">
+    <div class="panel">
+        <div class="panel-header">
+            <h3>System</h3>
+            <button class="btn btn-sm" id="refresh-btn">Refresh</button>
+        </div>
+        <div class="panel-body">
+            <table class="data-table" style="margin-bottom: 0;">
+                <thead><tr><th>Item</th><th>Value</th></tr></thead>
+                <tbody id="system-body"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="panel">
+        <div class="panel-header">
+            <h3>Features</h3>
+        </div>
+        <div class="panel-body">
+            <table class="data-table" style="margin-bottom: 0;">
+                <thead><tr><th>Feature</th><th>Available</th><th>Reason</th></tr></thead>
+                <tbody id="features-body"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="panel">
+        <div class="panel-header">
+            <h3>Packages</h3>
+        </div>
+        <div class="panel-body">
+            <table class="data-table" style="margin-bottom: 0;">
+                <thead><tr><th>Package</th><th>Version</th></tr></thead>
+                <tbody id="packages-body"></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/environment.js') }}"></script>
+{% endblock %}

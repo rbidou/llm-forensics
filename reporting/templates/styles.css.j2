@@ -1,0 +1,288 @@
+:root {
+    --bg-primary:    #0d1117;
+    --bg-secondary:  #161b22;
+    --bg-tertiary:   #21262d;
+    --bg-hover:      #30363d;
+    --border:        #30363d;
+
+    --text-primary:   #e6edf3;
+    --text-secondary: #8b949e;
+    --text-muted:     #6e7681;
+
+    --accent:       #ff8c42;
+    --accent-hover: #ffa366;
+    --accent-dim:   rgba(255, 140, 66, 0.15);
+    --accent-rgb:   255, 140, 66;
+
+    --danger:  #f85149;
+    --warning: #d29922;
+    --info:    #58a6ff;
+    --success: #3fb950;
+
+    --danger-dim:  rgba(248, 81, 73, 0.15);
+    --warning-dim: rgba(210, 153, 34, 0.15);
+    --info-dim:    rgba(88, 166, 255, 0.15);
+    --success-dim: rgba(63, 185, 80, 0.15);
+    --muted-dim:   rgba(110, 118, 129, 0.15);
+
+    --font-mono: 'Cascadia Code', 'Fira Code', 'JetBrains Mono', 'Consolas', monospace;
+    --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+html, body { max-width: 100%; }
+
+body {
+    font-family: var(--font-sans);
+    font-size: 14px;
+    line-height: 1.5;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    overflow-wrap: anywhere;
+}
+
+.report { max-width: 1280px; margin: 0 auto; padding: 32px 40px; }
+
+/* ---------- Header ---------- */
+.report-header { margin-bottom: 28px; }
+.report-header .brand {
+    font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 2px; margin-bottom: 6px;
+}
+.report-header h1 { font-size: 24px; font-weight: 600; color: var(--accent); }
+.report-header .subtitle { font-size: 14px; color: var(--text-secondary); margin-top: 4px; }
+
+h2 { font-size: 18px; font-weight: 600; margin: 32px 0 12px; }
+h3 { font-size: 15px; font-weight: 600; }
+h4 { font-size: 13px; font-weight: 600; color: var(--text-secondary); margin: 16px 0 8px; }
+
+/* ---------- Report groups (assessment) ---------- */
+/* Large caps title with a full-width underscore; a separator sits between consecutive groups. */
+.group-title {
+    font-size: 22px; font-weight: 700; text-transform: uppercase; letter-spacing: 2px;
+    color: var(--text-primary); margin: 0 0 24px; padding-bottom: 12px;
+    border-bottom: 2px solid var(--accent);
+}
+.group-sep { border: none; border-top: 1px solid var(--border); margin: 44px 0 36px; }
+/* A lighter divider set before each major section inside a report (e.g. a provenance deep comparison). */
+.section-sep { border: none; border-top: 1px solid var(--border); margin: 36px 0 20px; }
+
+.section-label {
+    font-size: 12px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px;
+    margin: 0 0 8px; font-weight: 600;
+}
+
+.hint { font-size: 13px; color: var(--text-secondary); margin-bottom: 12px; }
+.text-muted { color: var(--text-muted); }
+.mono { font-family: var(--font-mono); font-size: 13px; }
+.key-id { font-family: var(--font-mono); font-size: 13px; font-weight: 600; color: var(--accent); }
+
+/* ---------- Panels ---------- */
+.panel {
+    background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 8px;
+    margin-bottom: 24px; min-width: 0;
+}
+.panel-header {
+    padding: 16px 20px; border-bottom: 1px solid var(--border);
+    display: flex; flex-wrap: wrap; gap: 8px 12px; justify-content: space-between; align-items: center;
+}
+.panel-header h3 { min-width: 0; }
+.panel-body { padding: 20px; min-width: 0; }
+.panel-body > :last-child { margin-bottom: 0; }
+.panel.warning { border-color: var(--warning); }
+.panel.warning .panel-header h3 { color: var(--warning); }
+.panel.danger { border-color: var(--danger); }
+.panel.danger .panel-header h3 { color: var(--danger); }
+
+.message-list { list-style: none; }
+.message-list li { padding: 6px 0; border-bottom: 1px solid var(--border); }
+.message-list li:last-child { border-bottom: none; }
+.panel.warning .message-list li { color: var(--warning); }
+
+/* ---------- Stat cards ---------- */
+.stats-grid {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 16px; margin-bottom: 28px;
+}
+.stat-card {
+    background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 8px; padding: 16px 20px;
+    min-width: 0;
+}
+.stat-card .stat-label {
+    font-size: 12px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px;
+}
+.stat-card .stat-value { font-size: 26px; font-weight: 700; color: var(--accent); font-family: var(--font-mono); }
+.stat-card .stat-note { font-size: 12px; color: var(--text-secondary); margin-top: 4px; }
+/* A card whose metric illustrates a risk or drives a decision takes an accent edge and a tag. */
+.stat-card.stat-lit { border-color: var(--accent); }
+.stat-card .stat-tag { margin-left: 6px; vertical-align: middle; }
+
+/* ---------- Tables ---------- */
+.table-scroll { width: 100%; overflow-x: auto; margin-bottom: 24px; }
+.table-scroll:last-child { margin-bottom: 0; }
+.data-table {
+    width: 100%; border-collapse: collapse; background: var(--bg-secondary);
+    border: 1px solid var(--border); border-radius: 8px;
+}
+.data-table th {
+    background: var(--bg-tertiary); padding: 10px 14px; text-align: left; font-size: 12px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 1px; color: var(--text-muted); border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+}
+.data-table td { padding: 8px 14px; font-size: 14px; border-bottom: 1px solid var(--border); vertical-align: top; }
+.data-table tr:last-child td { border-bottom: none; }
+.data-table td.num, .data-table th.num { text-align: right; font-family: var(--font-mono); font-size: 13px; }
+.data-table td.name { font-family: var(--font-mono); font-size: 13px; min-width: 220px; }
+.data-table td.wide { min-width: 260px; }
+.data-table td.nowrap { white-space: nowrap; }
+.data-table.one-line td { white-space: nowrap; }
+.data-table tr.row-hot td { background: var(--warning-dim); }
+.data-table tr.row-best td { background: var(--accent-dim); }
+.data-table td.token-cell { white-space: nowrap; }
+.data-table td.token-cell .tok { white-space: pre; word-break: normal; }
+.kv-table th { width: 30%; text-transform: none; letter-spacing: 0; font-size: 13px; white-space: normal; }
+.kv-table td { font-family: var(--font-mono); font-size: 13px; }
+
+/* ---------- Bars ---------- */
+.bar-cell { min-width: 160px; }
+.bar-track { background: var(--bg-tertiary); border-radius: 4px; height: 8px; overflow: hidden; }
+.bar-fill { background: var(--accent); height: 100%; }
+.bar-list { display: grid; grid-template-columns: minmax(70px, max-content) 1fr minmax(70px, max-content); gap: 6px 12px; align-items: center; }
+.bar-list .bar-label { font-family: var(--font-mono); font-size: 13px; color: var(--text-secondary); }
+.bar-list .bar-value { font-family: var(--font-mono); font-size: 13px; text-align: right; }
+
+/* ---------- Badges, tags, verdicts ---------- */
+.badge {
+    display: inline-block; padding: 2px 9px; border-radius: 12px; font-size: 11px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.5px; white-space: nowrap; border: 1px solid;
+}
+.badge-success { background: var(--success-dim); color: var(--success); border-color: var(--success); }
+.badge-danger  { background: var(--danger-dim);  color: var(--danger);  border-color: var(--danger); }
+.badge-info    { background: var(--info-dim);    color: var(--info);    border-color: var(--info); }
+.badge-warning { background: var(--warning-dim); color: var(--warning); border-color: var(--warning); }
+.badge-neutral { background: var(--muted-dim);   color: var(--text-muted); border-color: var(--text-muted); }
+.badge-accent  { background: var(--accent-dim);  color: var(--accent);  border-color: var(--accent); }
+
+.tag {
+    display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 12px; font-weight: 600;
+    background: var(--bg-tertiary); color: var(--text-secondary); white-space: nowrap;
+}
+
+.verdict { margin-bottom: 16px; padding: 12px 16px; border-radius: 6px; font-weight: 600; }
+.verdict .verdict-detail { display: block; font-weight: 400; font-size: 13px; margin-top: 4px; }
+.verdict.ok   { background: var(--success-dim); color: var(--success); }
+.verdict.bad  { background: var(--danger-dim);  color: var(--danger); }
+.verdict.warn { background: var(--warning-dim); color: var(--warning); }
+.verdict.info { background: var(--info-dim);    color: var(--info); }
+.verdict.none { background: var(--muted-dim);   color: var(--text-muted); }
+.verdict .verdict-risk { display: block; font-size: 22px; font-weight: 700; letter-spacing: 0.5px; }
+
+/* Summary table: four parts, heavier row separators */
+.exec-table > tbody > tr > th, .exec-table > tbody > tr > td { border-bottom: 2px solid var(--border); padding: 12px 14px; }
+.exec-table > tbody > tr:last-child > th, .exec-table > tbody > tr:last-child > td { border-bottom: none; }
+.exec-table th { width: 30%; text-transform: none; letter-spacing: 0; font-size: 13px; white-space: nowrap; color: var(--text-secondary); }
+.exec-table td .badge { margin-right: 6px; }
+.exec-table p { margin-bottom: 6px; }
+.exec-table p:last-child { margin-bottom: 0; }
+.marker-list { list-style: none; display: grid; gap: 6px; }
+.marker-list li { display: flex; align-items: baseline; gap: 8px; }
+
+/* ---------- Legends ---------- */
+.legend-row { display: flex; flex-wrap: wrap; gap: 16px 32px; margin-top: 12px; }
+.legend { font-size: 13px; color: var(--text-secondary); min-width: 220px; }
+.legend .legend-title { font-size: 12px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-muted); font-weight: 600; margin-bottom: 4px; }
+.legend dd { margin: 2px 0; }
+.legend .legend-key { display: inline-block; min-width: 2.6em; font-family: var(--font-mono); font-weight: 600; color: var(--text-primary); }
+
+/* ---------- Tokens ---------- */
+.tok {
+    display: inline-block; font-family: var(--font-mono); font-size: 13px; padding: 0 6px; margin: 2px 0;
+    border-radius: 4px; background: var(--bg-tertiary); border: 1px solid var(--border);
+    color: var(--text-primary); white-space: pre-wrap; word-break: break-all;
+}
+.tok-ctl { color: var(--text-muted); }
+.chip-list { display: flex; flex-wrap: wrap; gap: 6px 10px; }
+.chip { display: inline-flex; align-items: baseline; gap: 6px; }
+.chip .score { font-family: var(--font-mono); font-size: 12px; color: var(--text-secondary); }
+.chip-accent { padding: 1px 6px; border: 1px solid var(--accent); border-radius: 4px; background: var(--accent-dim); }
+
+.null-line { font-size: 13px; color: var(--text-secondary); margin-top: 8px; }
+.null-line .mono { color: var(--text-primary); }
+
+/* Projection axis ends: the one whose |z| clears the null threshold is accented. */
+.axis-end { padding: 8px 12px; border-left: 3px solid transparent; border-radius: 6px; }
+.axis-end-hot { border-left-color: var(--accent); background: var(--accent-dim); }
+
+/* Tool-report sources: one model per line, each value on a single horizontally scrollable line. */
+.source-list { display: flex; flex-direction: column; gap: 8px; }
+.source-row { display: flex; gap: 12px; align-items: baseline; min-width: 0; }
+.source-key {
+    flex: none; min-width: 72px; font-size: 12px; font-weight: 600; color: var(--text-muted);
+    text-transform: uppercase; letter-spacing: 1px;
+}
+.source-val {
+    flex: 1; min-width: 0; font-family: var(--font-mono); font-size: 13px; color: var(--text-primary);
+    white-space: nowrap; overflow-x: auto;
+}
+
+/* ---------- Layout helpers ---------- */
+.two-col { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.metric-row { display: flex; flex-wrap: wrap; gap: 8px 24px; margin-bottom: 16px; }
+.metric { min-width: 0; }
+.metric .section-label { margin-bottom: 2px; }
+.metric .mono { color: var(--text-primary); }
+
+.output-block {
+    background: var(--bg-primary); border: 1px solid var(--border); border-radius: 6px; padding: 12px 16px;
+    font-family: var(--font-mono); font-size: 13px; color: var(--text-primary);
+    white-space: pre-wrap; word-break: break-all; max-height: 500px; overflow-y: auto;
+}
+
+details { margin-bottom: 12px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg-primary); }
+details > summary { cursor: pointer; padding: 10px 14px; font-size: 13px; color: var(--text-secondary); }
+details > .details-body { padding: 4px 14px 14px; }
+
+/* Collapsed addendum: its summary reads as a section title. */
+.addendum > summary.addendum-head { font-size: 15px; font-weight: 600; color: var(--text-primary); padding: 14px 18px; }
+/* Collapsed panel (e.g. skipped provenance candidates): its summary reads as a panel header. */
+.panel-collapse > summary.panel-collapse-head { font-size: 15px; font-weight: 600; color: var(--text-primary); padding: 16px 20px; }
+.addendum > .addendum-body { padding: 8px 18px 18px; }
+
+.report-footer { margin-top: 32px; font-size: 12px; color: var(--text-muted); text-align: center; }
+
+/* ---------- Responsive ---------- */
+/* Wide-table pairs (embeddings + token circuits) stack sooner than ordinary two-column blocks. */
+@media (max-width: 1400px) {
+    .two-col-wide { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 768px) {
+    .report { padding: 20px 16px; }
+    .two-col { grid-template-columns: minmax(0, 1fr); }
+    .stats-grid { grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); }
+    .stat-card .stat-value { font-size: 20px; }
+    .data-table td.name { min-width: 160px; }
+}
+
+/* ---------- Print: light theme ---------- */
+@media print {
+    :root {
+        --bg-primary:    #ffffff;
+        --bg-secondary:  #ffffff;
+        --bg-tertiary:   #f0f2f4;
+        --bg-hover:      #e6e8eb;
+        --border:        #c8ccd1;
+        --text-primary:   #111111;
+        --text-secondary: #3d444d;
+        --text-muted:     #59636e;
+        --accent:       #b3541e;
+        --accent-dim:   rgba(179, 84, 30, 0.12);
+        --warning:      #8a6100;
+        --success:      #1a7f37;
+        --danger:       #c62828;
+        --info:         #0b5cad;
+    }
+    body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .report { max-width: none; padding: 0; }
+    .panel, .stat-card, tr, details { break-inside: avoid; }
+    .output-block { max-height: none; overflow: visible; }
+    .table-scroll { overflow: visible; }
+}

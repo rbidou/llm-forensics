@@ -1,0 +1,5 @@
+{% extends "base.html.j2" %}
+{% from "provenance_sections.html.j2" import provenance_sections %}
+{% block content %}
+{{ provenance_sections(data) }}
+{% endblock %}

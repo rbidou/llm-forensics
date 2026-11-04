@@ -1,0 +1,84 @@
+{% extends "app/base.html" %}
+{% import "app/macros.html" as m with context %}
+{% set active_page = 'reports' %}
+{% block title %}LLM Forensics - Reports{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2>Reports</h2>
+    <p>Every saved analysis: open it in a new tab, download it as HTML or JSON, or delete it</p>
+</div>
+
+{{ m.feature_banner('reports') }}
+
+<!-- 2. LOADING -->
+<div id="loading-section" style="display: none;">
+    <div class="loading-overlay">
+        <span class="spinner"></span> Listing the reports...
+    </div>
+</div>
+
+<!-- 3. ERROR -->
+<div id="error-section" style="display: none;">
+    <div class="panel">
+        <div class="panel-body">
+            <div class="empty-state">
+                <p id="error-message" style="color: var(--danger);"></p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 4. RESULTS -->
+<div id="results-section" style="display: none;">
+    <div class="panel">
+        <div class="panel-header">
+            <h3>Saved reports</h3>
+            <div class="button-row" style="margin-top: 0;">
+                <span class="text-muted text-mono text-break" id="reports-root"></span>
+                <button class="btn btn-sm" id="refresh-btn">Refresh</button>
+            </div>
+        </div>
+        <div class="panel-body">
+            <div class="empty-state" id="reports-empty" style="display: none;">
+                <p>No report yet: every analysis saves one when it finishes.</p>
+            </div>
+            <div class="table-scroll" id="reports-table">
+                <table class="data-table" style="margin-bottom: 0;">
+                    <thead>
+                        <tr>
+                            <th>Model</th>
+                            <th>Analysis</th>
+                            <th>Created</th>
+                            <th>Size</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="reports-body"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal-overlay" id="delete-overlay" style="display: none;">
+    <div class="modal">
+        <div class="modal-header">
+            <h3>Delete report</h3>
+            <button class="modal-close" id="delete-close">&times;</button>
+        </div>
+        <div class="modal-body">
+            <p>Delete <span class="tech-id" id="delete-target"></span>? Its HTML and JSON files are removed; this cannot be undone.</p>
+        </div>
+        <div class="modal-footer">
+            <button class="btn" id="delete-cancel">Cancel</button>
+            <button class="btn btn-danger" id="delete-confirm">Delete</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/reports-list.js') }}"></script>
+<script src="{{ url_for('static', filename='js/reports.js') }}"></script>
+{% endblock %}

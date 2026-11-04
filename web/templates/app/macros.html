@@ -1,0 +1,138 @@
+{# Shared page fragments. Every element id is derived from the prefix, so the
+   JavaScript component reading them (model-picker.js) needs no configuration. #}
+
+{% macro feature_banner(page) %}
+{% if not features[page].available %}
+<div class="verdict bad" id="feature-disabled">
+    This feature is unavailable on this machine: {{ features[page].reason }}. See the Environment page.
+</div>
+{% endif %}
+{% endmacro %}
+
+{% macro run_button(page, label, button_id='run-btn') %}
+<button class="btn btn-primary" id="{{ button_id }}" data-run
+        data-disabled-feature="{{ 'false' if features[page].available else 'true' }}"
+        {% if not features[page].available %}disabled{% endif %}>{{ label }}</button>
+{% endmacro %}
+
+{% macro model_picker(prefix, label, description, allow_base=True) %}
+<div class="model-picker">
+    <div class="form-group" style="margin-bottom: 0;">
+        <label for="{{ prefix }}-ref">{{ label }}</label>
+        <p class="field-description">{{ description }}</p>
+        <div class="input-row">
+            <div class="autocomplete-wrapper">
+                <input type="text" class="form-control form-control-mono" id="{{ prefix }}-ref"
+                       placeholder="Local folder or .gguf file, or a Hub id (e.g. Qwen/Qwen2.5-1.5B)" autocomplete="off">
+                <div class="autocomplete-dropdown" id="{{ prefix }}-dropdown"></div>
+            </div>
+            <button class="btn" type="button" id="{{ prefix }}-browse-btn">Browse&hellip;</button>
+            <button class="btn" type="button" id="{{ prefix }}-detect-btn">Detect</button>
+        </div>
+        <p class="detect-info" id="{{ prefix }}-info"></p>
+        <div class="folder-browser" id="{{ prefix }}-browser" style="display: none;">
+            <div class="browser-bar">
+                <select class="form-control form-control-sm" id="{{ prefix }}-browser-root"></select>
+                <button class="btn btn-sm" type="button" id="{{ prefix }}-browser-up">&uarr; Up</button>
+                <span class="browser-path" id="{{ prefix }}-browser-path"></span>
+            </div>
+            <p class="detect-info error" id="{{ prefix }}-browser-error" style="display: none;"></p>
+            <div class="browser-list">
+                <table class="data-table"><tbody id="{{ prefix }}-browser-body"></tbody></table>
+            </div>
+            <div class="browser-actions">
+                <button class="btn btn-primary btn-sm" type="button" id="{{ prefix }}-browser-choose">Use this folder</button>
+                <button class="btn btn-sm" type="button" id="{{ prefix }}-browser-cancel">Cancel</button>
+            </div>
+        </div>
+    </div>
+    <div class="picker-options">
+        <div class="form-group" id="{{ prefix }}-checkpoint-group" style="display: none;">
+            <label for="{{ prefix }}-checkpoint">Checkpoint</label>
+            <select class="form-control form-control-mono" id="{{ prefix }}-checkpoint"></select>
+        </div>
+        <div class="form-group" id="{{ prefix }}-gguf-group" style="display: none;">
+            <label for="{{ prefix }}-gguf">GGUF file</label>
+            <select class="form-control form-control-mono" id="{{ prefix }}-gguf"></select>
+        </div>
+        <div class="form-group" id="{{ prefix }}-base-group" style="display: none;">
+            <label for="{{ prefix }}-base-override">Adapter base override</label>
+            {% if allow_base %}
+            <input type="text" class="form-control form-control-mono" id="{{ prefix }}-base-override" autocomplete="off">
+            <p class="field-description">Leave empty to apply the adapter to the base it declares.</p>
+            {% else %}
+            <p class="field-description">The adapter is applied to the base it declares.</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endmacro %}
+
+{% macro directory_picker(prefix, label, description) %}
+{# A folder input with a Browse navigator that selects directories only. The element ids are
+   derived from the prefix, so directory-picker.js (DirectoryPicker) needs no configuration. The
+   navigator reuses the same markup and styles as the model picker's, folders only. #}
+<div class="form-group">
+    <label for="{{ prefix }}-input">{{ label }}</label>
+    <div class="input-row">
+        <input type="text" class="form-control form-control-mono" id="{{ prefix }}-input"
+               autocomplete="off" spellcheck="false">
+        <button class="btn" type="button" id="{{ prefix }}-browse-btn">Browse&hellip;</button>
+    </div>
+    <p class="field-description">{{ description }}</p>
+    <p class="field-description" id="{{ prefix }}-default-hint"></p>
+    <div class="folder-browser" id="{{ prefix }}-browser" style="display: none;">
+        <div class="browser-bar">
+            <select class="form-control form-control-sm" id="{{ prefix }}-browser-root"></select>
+            <button class="btn btn-sm" type="button" id="{{ prefix }}-browser-up">&uarr; Up</button>
+            <span class="browser-path" id="{{ prefix }}-browser-path"></span>
+        </div>
+        <p class="detect-info error" id="{{ prefix }}-browser-error" style="display: none;"></p>
+        <div class="browser-list">
+            <table class="data-table"><tbody id="{{ prefix }}-browser-body"></tbody></table>
+        </div>
+        <div class="browser-actions">
+            <button class="btn btn-primary btn-sm" type="button" id="{{ prefix }}-browser-choose">Use this folder</button>
+            <button class="btn btn-sm" type="button" id="{{ prefix }}-browser-cancel">Cancel</button>
+        </div>
+    </div>
+</div>
+{% endmacro %}
+
+{% macro job_sections(title, show_steps=False) %}
+<!-- 2. LOADING -->
+<div id="loading-section" style="display: none;">
+    <div class="panel">
+        <div class="panel-header">
+            <h3 id="progress-title">{{ title }}</h3>
+            <span class="badge badge-accent"><span class="status-dot building"></span>running</span>
+        </div>
+        <div class="panel-body">
+            {% if show_steps %}
+            <ol id="workflow-steps" class="workflow-steps" aria-label="Workflow steps"></ol>
+            {% endif %}
+            <div class="progress-track"><div class="progress-fill" id="progress-fill"></div></div>
+            <p class="progress-message" id="progress-message"></p>
+            <button class="btn btn-danger btn-sm" id="cancel-btn" style="display: none;">Cancel</button>
+        </div>
+    </div>
+</div>
+
+<!-- 3. ERROR -->
+<div id="error-section" style="display: none;">
+    <div class="panel">
+        <div class="panel-body">
+            <div class="empty-state">
+                <p id="error-message" style="color: var(--danger);"></p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endmacro %}
+
+{% macro messages_block(prefix, title) %}
+<div id="{{ prefix }}-block" style="display: none;">
+    <div class="section-label">{{ title }}</div>
+    <ul class="message-list" id="{{ prefix }}-list"></ul>
+</div>
+{% endmacro %}

@@ -1,0 +1,130 @@
+{# The sections of a token-shift result (TokenShiftResult), shared by the shifts and lineage reports. #}
+{% import "macros.html.j2" as m %}
+
+{% macro shifts_sections(s) %}
+{% set counts = s.counts or {} %}
+{% set peak = s|peak_alignment_z %}
+<div class="stats-grid">
+    {{ m.stat_card("Compared", counts.compared|num) }}
+    {{ m.stat_card("Changed", counts.changed|num) }}
+    {{ m.stat_card("Identical", counts.identical|num) }}
+    {{ m.stat_card("Unmatched", counts.unmatched|num) }}
+    {{ m.stat_card("Vocabulary", s.vocabulary|num, "tokens projected onto" if s.vocabulary else "no projection") }}
+    {{ m.stat_card("Peak alignment", ("z " ~ peak|num(3)) if peak is not none else MISSING, "strongest token-set alignment vs the shuffle null", s|shifts_risk) }}
+</div>
+
+{% if s.layers %}
+<section class="panel">
+    <div class="panel-header"><h3>Layer profile</h3><span class="text-muted">mean ‖ΔW‖ / ‖W‖ of the changed tensors</span></div>
+    <div class="panel-body">
+        {% set rows = [] %}
+        {% for layer in s.layers %}{% set _ = rows.append(("L" ~ layer.layer if layer.layer >= 0 else "other", layer.mean_rel_change)) %}{% endfor %}
+        {{ m.bar_list(rows) }}
+    </div>
+</section>
+{% endif %}
+
+<section class="panel">
+    <div class="panel-header"><h3>Top updates</h3><span class="text-muted">by leading singular value σ1</span></div>
+    <div class="panel-body">
+        {% if s.top_updates %}
+        <p class="hint">SVD signs are arbitrary: read the + and − ends as the two ends of one axis.
+            Writers are read through the unembedding (tokens the update promotes), readers through the
+            embeddings (tokens that trigger it). Each end is compared with random directions (null).</p>
+        <div class="table-scroll">
+            <table class="data-table one-line">
+                <thead><tr>
+                    <th>#</th><th class="num">Layer</th><th>Type</th><th>Module</th><th>Role</th>
+                    <th class="num">σ1</th><th class="num">Share</th>
+                    <th class="num">Rank</th><th class="num">Rel change</th><th class="num">Noise floor</th><th>Noise</th>
+                </tr></thead>
+                <tbody>
+                {% for update in s.top_updates %}
+                {% set az = update|alignment_z %}
+                <tr{% if az is not none and az >= Z_NOTABLE %} class="row-hot"{% endif %}>
+                    <td class="num">{{ loop.index }}</td>
+                    <td class="num">{{ update.layer|num if update.layer >= 0 else "—" }}</td>
+                    <td class="mono">{{ update.name|tensor_type }}</td>
+                    <td class="mono">{{ update.module|module_abbr }}</td>
+                    <td><span class="tag" title="{{ update.role }}">{{ update.role|role_abbr }}</span></td>
+                    <td class="num">{{ update.sigma|num }}</td>
+                    <td class="num">{{ update.share|pct }}</td>
+                    <td class="num">{{ update.rank|num }}</td>
+                    <td class="num">{{ update.rel_change|num }}</td>
+                    <td class="num">{{ update.noise_floor|num }}</td>
+                    <td>{{ m.beyond_noise(update.beyond_noise) }}</td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {{ m.tensor_legend() }}
+        {# Group the per-update details by role (writers promote tokens, readers trigger on them),
+           then order each group by its strongest end (highest |z|) first. The index is the update's
+           rank in the table above, kept through the re-ordering. #}
+        {% set promote = [] %}{% set trigger = [] %}{% set other = [] %}
+        {% for update in s.top_updates %}
+        {# key "upd", not "update": item.update would resolve to the dict's built-in update() method. #}
+        {% set item = {"index": loop.index, "upd": update, "z": update|peak_z} %}
+        {% if update.role == "writer" %}{% set _ = promote.append(item) %}
+        {% elif update.role == "reader" %}{% set _ = trigger.append(item) %}
+        {% else %}{% set _ = other.append(item) %}{% endif %}
+        {% endfor %}
+        {% if promote %}
+        <h4>Promote shifts · writer updates (logit lens)</h4>
+        {% for item in promote|sort(attribute="z", reverse=true) %}{{ update_projection(item.index, item.upd) }}{% endfor %}
+        {% endif %}
+        {% if trigger %}
+        <h4>Trigger shifts · reader updates (embedding cosine)</h4>
+        {% for item in trigger|sort(attribute="z", reverse=true) %}{{ update_projection(item.index, item.upd) }}{% endfor %}
+        {% endif %}
+        {% if other %}
+        <h4>No vocabulary reading</h4>
+        {% for item in other|sort(attribute="z", reverse=true) %}{{ update_projection(item.index, item.upd) }}{% endfor %}
+        {% endif %}
+        {% else %}
+        <p class="text-muted">No 2-D update to project.</p>
+        {% endif %}
+    </div>
+</section>
+
+{% if s.embedding_rows %}
+<section class="panel">
+    <div class="panel-header"><h3>Embedding rows moved most</h3><span class="text-muted">relative change of each token's row</span></div>
+    <div class="panel-body">
+        {% for matrix in s.embedding_rows %}
+        <div class="section-label mono">{{ matrix.name }}</div>
+        {{ m.token_chips(matrix.tokens) }}
+        {% endfor %}
+    </div>
+</section>
+{% endif %}
+{% endmacro %}
+
+{% macro update_projection(index, update) %}
+<details open>
+    <summary><span class="mono">{{ index }}.</span> <span class="key-id">{{ update.name }}</span>
+        · layer <span class="mono">{{ update.layer|num if update.layer >= 0 else "—" }}</span>
+        · σ1 <span class="mono">{{ update.sigma|num }}</span></summary>
+    <div class="details-body">
+        {% set projection = update.projection %}
+        {% if projection %}
+        <p class="hint">This update <strong>{{ projection.relation|relation }}</strong> these tokens.</p>
+        <div class="two-col">
+            {% for sign, end in [("+", projection.positive), ("−", projection.negative)] %}
+            {% set hot = end and end.null and end.null.z is number and (end.null.z|abs) >= Z_NOTABLE %}
+            <div class="axis-end{% if hot %} axis-end-hot{% endif %}">
+                <div class="section-label">{{ sign }} end</div>
+                {% if end %}
+                {{ m.token_chips(end.tokens) }}
+                {{ m.null_comparison(end.null) }}
+                {% else %}<p class="text-muted">None.</p>{% endif %}
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="text-muted">No vocabulary reading for a {{ update.role }} tensor.</p>
+        {% endif %}
+    </div>
+</details>
+{% endmacro %}

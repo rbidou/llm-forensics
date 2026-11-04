@@ -1,0 +1,153 @@
+{# The sections of a vocabulary & embedding result (VocabResult), shared by the vocab and assessment reports. #}
+{% import "macros.html.j2" as m %}
+
+{% macro vocab_sections(v) %}
+{% set d = v.diff %}
+<div class="stats-grid">
+    {% if d %}
+    {{ m.stat_card("Base vocab", d.base_size|num) }}
+    {{ m.stat_card("Tuned vocab", d.tuned_size|num) }}
+    {{ m.stat_card("Aligned", d.aligned_tokens|num, "same id ↔ token in both") }}
+    {{ m.stat_card("Added", d.added|length, risk=v|vocab_risk) }}
+    {{ m.stat_card("Removed", d.removed|length, "dropped from the tuned vocab") }}
+    {{ m.stat_card("Reassigned", d.reassigned|length, "id changed: alignment break") }}
+    {% else %}
+    {{ m.stat_card("Vocabulary", v.vocabulary|num, "rows aligned by position (no tokenizer)") }}
+    {{ m.stat_card("New rows", v.new_tokens|length, risk=v|vocab_risk) }}
+    {% endif %}
+</div>
+
+{% if d %}
+<section class="panel">
+    <div class="panel-header"><h3>Vocabulary diff</h3><span class="text-muted">how the tuned tokenizer differs</span></div>
+    <div class="panel-body">
+        {% if d.added %}
+        <div class="section-label">Added tokens <span class="text-muted">({{ d.added|length }}; id shown)</span></div>
+        {{ m.token_chips(d.added[:60], "token_id", "num") }}
+        {% endif %}
+        {% if d.removed %}
+        <div class="section-label">Removed tokens <span class="text-muted">({{ d.removed|length }}; id shown)</span></div>
+        {{ m.token_chips(d.removed[:60], "token_id", "num") }}
+        {% endif %}
+        {% if d.reassigned %}
+        <div class="section-label">Reassigned tokens <span class="text-muted">same text, different id — breaks id alignment</span></div>
+        <div class="table-scroll">
+            <table class="data-table">
+                <thead><tr><th>Token</th><th class="num">Base id</th><th class="num">Tuned id</th></tr></thead>
+                <tbody>
+                {% for change in d.reassigned[:60] %}
+                <tr><td>{{ change.text|token }}</td><td class="num">{{ change.other_id|num }}</td><td class="num">{{ change.token_id|num }}</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
+        {% if d.special_changed %}
+        <div class="section-label">Special tokens</div>
+        <ul class="message-list">{% for line in d.special_changed %}<li>{{ line }}</li>{% endfor %}</ul>
+        {% endif %}
+        <div class="null-line">normalizer {{ m.flag(d.normalizer_changed, "changed", "unchanged", "badge-warning", "badge-neutral") }}</div>
+        {% if not d.added and not d.removed and not d.reassigned and not d.special_changed %}
+        <p class="text-muted">The vocabularies are identical.</p>
+        {% endif %}
+    </div>
+</section>
+{% endif %}
+
+{% if v.embeddings %}
+<section class="panel">
+    <div class="panel-header"><h3>Shared-row embedding shift</h3><span class="text-muted">how the common token rows moved</span></div>
+    <div class="panel-body">
+        <p class="hint">Rows present in both vocabularies, compared one token at a time. The concentration z
+            says whether a few rows moved far more than the rest (targeted) or the change is broad.</p>
+        {% for shift in v.embeddings %}
+        <div class="section-label mono">{{ shift.name }}</div>
+        <div class="null-line">
+            compared <span class="mono">{{ shift.rows_compared|num }}</span>
+            · changed <span class="mono">{{ shift.rows_changed|num }}</span>
+            {% if shift.noise_floor is not none %}· noise floor <span class="mono">{{ shift.noise_floor|num }}</span>{% endif %}
+        </div>
+        {{ m.null_comparison(shift.concentration, "top row") }}
+        {{ m.token_chips(shift.moved, "rel_change", "num") }}
+        {% endfor %}
+    </div>
+</section>
+{% endif %}
+
+{% if v.new_tokens %}
+<section class="panel">
+    <div class="panel-header"><h3>New tokens</h3><span class="text-muted">each added token, read from its embedding rows</span></div>
+    <div class="panel-body">
+        <p class="hint">A trained embedding means the fine-tune taught the token, not a placeholder. Emittable means
+            the model can also produce it (an untied output row): a read-only token is the shape of a trigger,
+            an emittable one the shape of a payload.</p>
+        <div class="table-scroll">
+            <table class="data-table">
+                <thead><tr>
+                    <th>Token</th><th class="num">Input norm</th><th class="num">Output norm</th>
+                    <th>Trained</th><th>Emittable</th><th>Nearest existing tokens</th>
+                </tr></thead>
+                <tbody>
+                {% for token in v.new_tokens %}
+                <tr>
+                    <td class="token-cell">{{ token.text|token }}</td>
+                    <td class="num">{{ token.input_norm|num }}</td>
+                    <td class="num">{{ token.output_norm|num }}</td>
+                    <td>{{ m.flag(token.trained, "T", "P", "badge-warning", "badge-neutral") }}</td>
+                    <td>{{ m.flag(token.emittable, "E", "R", "badge-danger", "badge-neutral") }}</td>
+                    <td class="wide">{{ m.token_chips(token.neighbours) }}</td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {{ m.legend_block("Token flags", LABEL_GLOSSARY["Token flags"]) }}
+    </div>
+</section>
+{% endif %}
+
+{% if v.reader_triggers %}
+<section class="panel">
+    <div class="panel-header">
+        <h3>Reader triggers on the extended vocabulary</h3>
+        <span class="text-muted">the heaviest reader updates, re-projected onto the suspect's own tokens</span>
+    </div>
+    <div class="panel-body">
+        <p class="hint">Token Shifts reads reader directions against the base vocabulary, so it cannot show a
+            trigger that is one of the added tokens. These updates are projected against the suspect's embeddings
+            instead; an <span class="badge badge-danger">added</span> token at a high-z end is the shape of a hidden trigger.</p>
+        {% for reader in v.reader_triggers %}
+        {% set new_ids = reader.new_hits | map(attribute='token_id') | list %}
+        <details {% if reader.new_hits %}open{% endif %}>
+            <summary><span class="key-id">{{ reader.name }}</span>
+                · layer <span class="mono">{{ reader.layer|num if reader.layer >= 0 else "—" }}</span>
+                · σ1 <span class="mono">{{ reader.sigma|num }}</span>
+                {% if reader.new_hits %}<span class="badge badge-danger">added-token trigger</span>{% endif %}</summary>
+            <div class="details-body">
+                {% if reader.projection %}
+                <div class="two-col">
+                    {% for sign, end in [("+", reader.projection.positive), ("−", reader.projection.negative)] %}
+                    {% set hot = end and end.null and end.null.z is number and (end.null.z|abs) >= Z_NOTABLE %}
+                    <div class="axis-end{% if hot %} axis-end-hot{% endif %}">
+                        <div class="section-label">{{ sign }} end</div>
+                        {% if end %}
+                        <div class="chip-list">
+                            {% for item in end.tokens %}
+                            <span class="chip{% if item.token_id in new_ids %} chip-accent{% endif %}">{{ item.text|token }}<span class="score">{{ item.score|num(3) }}</span></span>
+                            {% endfor %}
+                        </div>
+                        {{ m.null_comparison(end.null) }}
+                        {% else %}<p class="text-muted">None.</p>{% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <p class="text-muted">No vocabulary reading for this tensor.</p>
+                {% endif %}
+            </div>
+        </details>
+        {% endfor %}
+    </div>
+</section>
+{% endif %}
+{% endmacro %}

@@ -1,0 +1,9 @@
+{% extends "base.html.j2" %}
+{% block content %}
+<section class="panel">
+    <div class="panel-header"><h3>Result data</h3><span class="text-muted">no dedicated layout for this analysis</span></div>
+    <div class="panel-body">
+        <pre class="output-block">{{ data|pretty_json }}</pre>
+    </div>
+</section>
+{% endblock %}

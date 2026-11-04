@@ -1,0 +1,97 @@
+{% extends "app/base.html" %}
+{% import "app/macros.html" as m with context %}
+{% set active_page = 'provenance' %}
+{% block title %}LLM Forensics - Provenance{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2>Provenance</h2>
+    <p>Which candidate model a suspect's weights derive from: screened by raw similarity, then compared in depth with
+       basis-invariant circuits</p>
+</div>
+
+{{ m.feature_banner('provenance') }}
+
+<!-- 1. INPUT -->
+<div class="panel" id="input-panel">
+    <div class="panel-header">
+        <h3>Input</h3>
+        <button class="panel-toggle" type="button" aria-expanded="true" aria-controls="input-body"
+                data-panel-name="the input" aria-label="Collapse the input">
+            <span class="panel-toggle-chevron" aria-hidden="true">&rsaquo;</span>
+        </button>
+    </div>
+    <div class="panel-body" id="input-body">
+        {{ m.model_picker('suspect', 'Suspect model', 'The model under investigation: full weights, an adapter, GGUF or bitsandbytes.') }}
+
+        <div class="form-group">
+            <label for="candidates-input">Candidate parents</label>
+            <p class="field-description">Local paths or Hub ids, one per line (optional). Declared bases are always added.
+                Ctrl+Enter runs the analysis.</p>
+            <textarea class="form-control form-control-mono" id="candidates-input" rows="4"
+                      placeholder="Qwen/Qwen2.5-1.5B"></textarea>
+        </div>
+
+        <label class="toggle-row">
+            <span class="toggle-switch">
+                <input type="checkbox" id="search-toggle" checked>
+                <span class="toggle-slider"></span>
+            </span>
+            <span class="toggle-label">Search the Hub for same-type candidates</span>
+        </label>
+        <div id="search-options">
+            <div class="form-grid" style="margin-top: 8px;">
+                <div class="form-group">
+                    <label for="search-text">Search text</label>
+                    <div class="autocomplete-wrapper">
+                        <input type="text" class="form-control form-control-mono" id="search-text" autocomplete="off"
+                               placeholder="Leave empty to search by model type">
+                        <div class="autocomplete-dropdown" id="search-text-dropdown"></div>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="toggle-row" style="margin-top: 22px;">
+                        <span class="toggle-switch">
+                            <input type="checkbox" id="derived-toggle">
+                            <span class="toggle-slider"></span>
+                        </span>
+                        <span class="toggle-label">Include models that declare a base</span>
+                    </label>
+                </div>
+            </div>
+        </div>
+
+        <div class="form-grid">
+            <div class="form-group">
+                <label for="layers-input">Layers compared in depth</label>
+                <input type="number" class="form-control form-control-mono" id="layers-input" value="1" min="1" max="64">
+                <p class="field-description">Compared tensor by tensor from layer 0, 1 to 64.</p>
+            </div>
+            <div class="form-group">
+                <label for="topk-input">Top k</label>
+                <input type="number" class="form-control form-control-mono" id="topk-input" value="3" min="1" max="40">
+                <p class="field-description">Screened candidates compared in depth, 1 to 40.</p>
+            </div>
+        </div>
+        <div class="button-row">
+            {{ m.run_button('provenance', 'Find the provenance') }}
+        </div>
+    </div>
+</div>
+
+{{ m.job_sections('Finding the provenance') }}
+
+<!-- 4. RESULTS: the verdict summary only; every detail is in the saved report. -->
+<div id="results-section" style="display: none;">
+    <div class="button-row" id="result-actions"></div>
+
+    <h2 class="group-title">Summary</h2>
+    <div id="results-verdict" class="verdict"></div>
+    <ul class="message-list" id="summary-lines" style="display: none;"></ul>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/model-picker.js') }}"></script>
+<script src="{{ url_for('static', filename='js/provenance.js') }}"></script>
+{% endblock %}

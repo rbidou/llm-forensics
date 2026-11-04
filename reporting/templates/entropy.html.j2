@@ -1,0 +1,5 @@
+{% extends "base.html.j2" %}
+{% from "entropy_sections.html.j2" import entropy_sections %}
+{% block content %}
+{{ entropy_sections(data) }}
+{% endblock %}

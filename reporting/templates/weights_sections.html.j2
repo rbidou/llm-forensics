@@ -1,0 +1,103 @@
+{# The sections of a weight-diff result (WeightDiffResult), shared by the weights and assessment reports. #}
+{% import "macros.html.j2" as m %}
+
+{% macro weights_sections(data) %}
+{% set changed_share = (data.changed / data.compared) if data.compared else none %}
+{% set identical_share = (data.identical / data.compared) if data.compared else none %}
+<div class="stats-grid">
+    {{ m.stat_card("Compared", data.compared|num) }}
+    {{ m.stat_card("Changed", data.changed|num, (changed_share|pct ~ " of compared") if changed_share is not none else none, data|weight_risk) }}
+    {{ m.stat_card("Identical", data.identical|num, (identical_share|pct ~ " of compared") if identical_share is not none else none) }}
+    {{ m.stat_card("Unmatched", data.unmatched|num) }}
+    {% if data.beyond_noise is not none %}
+    {{ m.stat_card("Beyond noise", data.beyond_noise|num, "above their quantization noise floor") }}
+    {% endif %}
+</div>
+
+{% set tensors = data.tensors or [] %}
+<section class="panel">
+    <div class="panel-header">
+        <h3>Tensors</h3>
+        <span class="text-muted">by relative change ‖ΔW‖ / ‖W‖, largest first</span>
+    </div>
+    <div class="panel-body">
+        {% if tensors %}
+        <div class="table-scroll">
+            <table class="data-table one-line">
+                <thead><tr>
+                    <th class="num">Layer</th><th>Type</th><th>Module</th><th>Role</th><th>Shape</th>
+                    <th class="num">Rel change</th><th class="num">Cosine</th><th class="num">Max |Δ|</th>
+                    <th class="num">Frac changed</th><th class="num">Δ rank</th><th>Quantization</th>
+                    <th class="num">Noise floor</th><th>Noise</th>
+                </tr></thead>
+                <tbody>
+                {% for change in tensors[:TOP_TENSORS] %}
+                <tr>
+                    <td class="num">{{ change.layer|num if change.layer >= 0 else "—" }}</td>
+                    <td class="mono">{{ change.name|tensor_type }}</td>
+                    <td class="mono">{{ change.module|module_abbr }}</td>
+                    <td><span class="tag" title="{{ change.role }}">{{ change.role|role_abbr }}</span></td>
+                    <td class="mono">{{ (change.shape or [])|join("×") }}</td>
+                    <td class="num">{{ change.rel_change|num }}</td>
+                    <td class="num">{{ change.cosine|num(6) }}</td>
+                    <td class="num">{{ change.max_abs_diff|num }}</td>
+                    <td class="num">{{ change.frac_changed|pct }}</td>
+                    <td class="num">{{ change.delta_rank|num }}</td>
+                    <td class="mono">{{ change.quantization or "—" }}{% if change.floor_exact is false %} <span class="text-muted">(est.)</span>{% endif %}</td>
+                    <td class="num">{{ change.noise_floor|num }}</td>
+                    <td>{{ m.beyond_noise(change.beyond_noise) }}</td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% if tensors|length > TOP_TENSORS %}
+        <p class="hint">{{ (tensors|length - TOP_TENSORS)|num }} more tensors are not listed here: the full table is in report.json.</p>
+        {% endif %}
+        {{ m.tensor_legend() }}
+        {% else %}
+        <p class="text-muted">No tensor was compared.</p>
+        {% endif %}
+    </div>
+</section>
+
+<div class="two-col two-col-wide">
+    <section class="panel">
+        <div class="panel-header"><h3>By module</h3><span class="text-muted">mean rel change of the changed tensors</span></div>
+        <div class="panel-body">{{ group_table(data.by_module, "Module", true) }}</div>
+    </section>
+    <section class="panel">
+        <div class="panel-header"><h3>By layer</h3><span class="text-muted">mean rel change of the changed tensors</span></div>
+        <div class="panel-body">{{ group_table(data.by_layer, "Layer") }}</div>
+    </section>
+</div>
+{% endmacro %}
+
+{# A row is highlighted when its mean rel change stands out from the table (>= 2x the median). #}
+{% macro group_table(groups, label, is_module=false) %}
+{% if groups %}
+{% set means = groups|map(attribute="mean_rel_change")|list %}
+{% set top = means|peak %}
+<div class="table-scroll">
+    <table class="data-table">
+        <thead><tr><th>{{ label }}</th><th class="num">Tensors</th><th class="num">Mean rel</th><th></th></tr></thead>
+        <tbody>
+        {% for group in groups %}
+        <tr{% if group.mean_rel_change|above_typical(means) %} class="row-hot"{% endif %}>
+            {% if is_module %}
+            <td class="mono" title="{{ group.key }}">{{ group.key|module_group_label }}</td>
+            {% else %}
+            <td class="mono">{% if group.key == -1 %}outside layers{% else %}{{ group.key }}{% endif %}</td>
+            {% endif %}
+            <td class="num">{{ group.tensors|num }}</td>
+            <td class="num">{{ group.mean_rel_change|num }}</td>
+            <td class="bar-cell">{{ m.bar(group.mean_rel_change, top) }}</td>
+        </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<p class="text-muted">No changed tensor.</p>
+{% endif %}
+{% endmacro %}

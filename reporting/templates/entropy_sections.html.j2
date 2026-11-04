@@ -1,0 +1,109 @@
+{# The sections of an entropy result (EntropyResult), shared by the entropy and assessment reports. #}
+{% import "macros.html.j2" as m %}
+
+{% macro entropy_sections(data) %}
+{% set quantized = data.beyond_noise is not none %}
+<div class="stats-grid">
+    {{ m.stat_card("Examined", (data.counts.in_scope if data.counts else 0)|num, "tensors in the last layers and head") }}
+    {{ m.stat_card("Spectral", (data.counts.spectral if data.counts else 0)|num, "with a singular-value reading", data|entropy_risk) }}
+    {{ m.stat_card("Changed", (data.counts.changed if data.counts else 0)|num) }}
+    {{ m.stat_card("Blocks", data.layers|num, "last " ~ (data.meta.parameters.layers|num) ~ " examined" if data.layers is not none else "layer count unknown") }}
+    {% if quantized %}
+    {{ m.stat_card("Beyond noise", data.beyond_noise|num, "changes above their quantization noise floor") }}
+    {% endif %}
+</div>
+
+<section class="panel">
+    <div class="panel-header">
+        <h3>Entropy shift against a random update</h3>
+        <span class="text-muted">mean ΔH of the spectral-reading tensors, vs an update of the same norm</span>
+    </div>
+    <div class="panel-body">
+        {% if data.spectral_null %}{{ m.null_comparison(data.spectral_null, "spectral ΔH") }}{% endif %}
+        {% if data.value_null %}{{ m.null_comparison(data.value_null, "value ΔH") }}{% endif %}
+        {% if not data.spectral_null and not data.value_null %}
+        <p class="text-muted">No tensor carried a spectral reading, so no baseline could be built.</p>
+        {% endif %}
+    </div>
+</section>
+
+{% set tensors = data.tensors or [] %}
+<section class="panel">
+    <div class="panel-header">
+        <h3>Tensors</h3>
+        <span class="text-muted">by |spectral ΔH|, largest first; H in nats, Δ = tuned − base</span>
+    </div>
+    <div class="panel-body">
+        {% if tensors %}
+        {% set spectral_deltas = tensors|map(attribute="spectral.delta")|list %}
+        <div class="table-scroll">
+            <table class="data-table one-line">
+                <thead><tr>
+                    <th class="num">Layer</th><th>Type</th><th>Module</th><th>Role</th><th>Shape</th>
+                    <th class="num">Spectral base</th><th class="num">Spectral tuned</th><th class="num">Spectral Δ</th>
+                    <th class="num">Rank</th>
+                    <th class="num">Value base</th><th class="num">Value tuned</th><th class="num">Value Δ</th>
+                    {% if quantized %}<th>Quantization</th><th>Noise</th>{% endif %}
+                </tr></thead>
+                <tbody>
+                {% for tensor in tensors[:TOP_TENSORS] %}
+                <tr{% if tensor.spectral.delta|above_typical(spectral_deltas) %} class="row-hot"{% endif %}>
+                    <td class="num">{{ tensor.layer|num if tensor.layer >= 0 else "—" }}</td>
+                    <td class="mono">{{ tensor.name|tensor_type }}</td>
+                    <td class="mono">{{ tensor.module|module_abbr }}</td>
+                    <td><span class="tag" title="{{ tensor.role }}">{{ tensor.role|role_abbr }}</span></td>
+                    <td class="mono">{{ (tensor.shape or [])|join("×") }}</td>
+                    <td class="num">{{ tensor.spectral.base|num }}</td>
+                    <td class="num">{{ tensor.spectral.tuned|num }}</td>
+                    <td class="num">{{ tensor.spectral.delta|num }}</td>
+                    <td class="num">{{ tensor.effective_rank|num }}</td>
+                    <td class="num">{{ tensor.value.base|num }}</td>
+                    <td class="num">{{ tensor.value.tuned|num }}</td>
+                    <td class="num">{{ tensor.value.delta|num }}</td>
+                    {% if quantized %}
+                    <td class="mono">{{ tensor.quantization or "—" }}</td>
+                    <td>{{ m.beyond_noise(tensor.beyond_noise) }}</td>
+                    {% endif %}
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% if tensors|length > TOP_TENSORS %}
+        <p class="hint">{{ (tensors|length - TOP_TENSORS)|num }} more tensors are not listed here: the full table is in report.json.</p>
+        {% endif %}
+        {{ m.tensor_legend() }}
+        {% else %}
+        <p class="text-muted">No tensor was in scope.</p>
+        {% endif %}
+    </div>
+</section>
+
+<section class="panel">
+    <div class="panel-header">
+        <h3>By layer</h3>
+        <span class="text-muted">mean entropy shift of the in-scope tensors of each layer (−1: the head)</span>
+    </div>
+    <div class="panel-body">
+        {% if data.by_layer %}
+        <div class="table-scroll">
+            <table class="data-table">
+                <thead><tr><th>Layer</th><th class="num">Tensors</th><th class="num">Mean spectral Δ</th><th class="num">Mean value Δ</th></tr></thead>
+                <tbody>
+                {% for group in data.by_layer %}
+                <tr>
+                    <td class="mono">{% if group.layer == -1 %}head{% else %}{{ group.layer }}{% endif %}</td>
+                    <td class="num">{{ group.tensors|num }}</td>
+                    <td class="num">{{ group.mean_spectral_delta|num }}</td>
+                    <td class="num">{{ group.mean_value_delta|num }}</td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p class="text-muted">No tensor was in scope.</p>
+        {% endif %}
+    </div>
+</section>
+{% endmacro %}

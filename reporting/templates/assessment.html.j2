@@ -1,0 +1,185 @@
+{% extends "base.html.j2" %}
+{% import "macros.html.j2" as m %}
+{% from "provenance_sections.html.j2" import provenance_sections %}
+{% from "weights_sections.html.j2" import weights_sections %}
+{% from "entropy_sections.html.j2" import entropy_sections %}
+{% from "shifts_sections.html.j2" import shifts_sections %}
+{% from "vocab_sections.html.j2" import vocab_sections %}
+{% from "behaviour_sections.html.j2" import behaviour_sections %}
+{# The assessment report lays out its own sections, so the shared inputs/parameters preamble is off. #}
+{% block preamble %}{% endblock %}
+{% block content %}
+{% set verdict = data.verdict or {} %}
+{% set source = data.source or {} %}
+{% set executive = data.executive or {} %}
+{% set components = data.components or {} %}
+{% set flagged = (data.signals or [])|rejectattr("severity", "equalto", "none")|list %}
+
+{# ==================================================== Executive Summary #}
+<h2 class="group-title">Executive Summary</h2>
+<div class="verdict {{ verdict.level|risk_class }}">
+    <span class="verdict-risk">{{ verdict.level|risk_heading }}</span>
+    <span class="verdict-detail">{{ verdict.headline }}</span>
+</div>
+<section class="panel">
+    <div class="panel-body">
+        <table class="data-table exec-table">
+            <tbody>
+                <tr>
+                    <th>Risk &amp; confidence</th>
+                    <td>
+                        <span class="badge {{ verdict.level|risk_badge }}">{{ verdict.level|risk_heading }}</span>
+                        <span class="badge {{ verdict.confidence|confidence_badge }}">confidence {{ verdict.confidence }}</span>
+                    </td>
+                </tr>
+                <tr>
+                    <th>Source</th>
+                    <td>{{ executive.source or MISSING }}</td>
+                </tr>
+                <tr>
+                    <th>Markers</th>
+                    <td>
+                        {% if flagged %}
+                        <ul class="marker-list">
+                            {% for signal in flagged %}
+                            <li><span class="badge {{ signal.severity|severity_badge }}">{{ signal.severity }}</span> {{ signal.title }}</li>
+                            {% endfor %}
+                        </ul>
+                        {% else %}<span class="text-muted">Every analysis stayed within its baseline.</span>{% endif %}
+                    </td>
+                </tr>
+                <tr>
+                    <th>Impact &amp; example</th>
+                    <td>
+                        {% if executive.impact or executive.example %}
+                        {% if executive.impact %}<p><strong>Impact:</strong> {{ executive.impact }}</p>{% endif %}
+                        {% if executive.example %}<p><strong>Example:</strong> {{ executive.example }}</p>{% endif %}
+                        {% else %}<span class="text-muted">No material impact for the flags raised.</span>{% endif %}
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</section>
+
+{# ==================================================== Details #}
+<hr class="group-sep">
+<h2 class="group-title">Details</h2>
+
+{# -------------------------------------------------- source #}
+<section class="panel">
+    <div class="panel-header"><h3>Source</h3><span class="text-muted">how the comparison base was established</span></div>
+    <div class="panel-body">
+        {{ m.kv_table({
+            "mode": source.mode,
+            "base model": source.ref or MISSING,
+            "established": source.established,
+            "derivation verdict": source.provenance_verdict or MISSING,
+        }) }}
+    </div>
+</section>
+
+{# -------------------------------------------------- detailed analysis (the signals) #}
+<section class="panel">
+    <div class="panel-header">
+        <h3>Analysis Results</h3>
+        <span class="text-muted">one reading per tool, against its own baseline; strongest first</span>
+    </div>
+    <div class="panel-body">
+        {% if data.signals %}
+        <div class="table-scroll">
+            <table class="data-table">
+                <thead><tr><th>Severity</th><th>Tool</th><th>Finding</th><th>Evidence</th><th>Baseline</th></tr></thead>
+                <tbody>
+                {% for signal in data.signals %}
+                <tr>
+                    <td><span class="badge {{ signal.severity|severity_badge }}">{{ signal.severity }}</span></td>
+                    <td class="nowrap"><span class="tag">{{ signal.tool }}</span></td>
+                    <td>{{ signal.title }}</td>
+                    <td class="wide">
+                        {{ signal.detail }}
+                        {% if signal.metrics %}
+                        <div class="hint mono">{% for key, value in signal.metrics|dictsort %}{{ key }}={{ value|value_text }}{% if not loop.last %} · {% endif %}{% endfor %}</div>
+                        {% endif %}
+                    </td>
+                    <td class="text-muted">{{ signal.baseline or MISSING }}</td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}<p class="text-muted">No signal was produced.</p>{% endif %}
+    </div>
+</section>
+
+{# -------------------------------------------------- parameters #}
+<section class="panel">
+    <div class="panel-header"><h3>Parameters</h3></div>
+    <div class="panel-body">
+        {% if meta.parameters %}{{ m.kv_table_pair(meta.parameters) }}{% else %}<p class="text-muted">None recorded.</p>{% endif %}
+    </div>
+</section>
+
+{{ m.message_panel("Warnings", meta.warnings, "warning") }}
+{{ m.message_panel("Notes", meta.notes) }}
+
+{# ==================================================== Addendums #}
+<hr class="group-sep">
+<h2 class="group-title">Addendums</h2>
+<p class="hint">Each analysis below is the complete result the workflow ran; the full data is in report.json. Expand a section to read it.</p>
+{# The fourth field is whether the addendum shows the tool's Notes panel (off where they only repeat
+   the parameters, kept where they carry a caveat). #}
+{% set tools = [
+    ("Provenance", components.provenance, provenance_sections, true),
+    ("Weight Diff", components.weights, weights_sections, false),
+    ("Entropy Analysis", components.entropy, entropy_sections, true),
+    ("Token Shifts", components.shifts, shifts_sections, false),
+    ("Vocabulary & Embeddings", components.vocab, vocab_sections, true),
+    ("Behaviour Probe", components.behaviour, behaviour_sections, true),
+] %}
+{% set ns = namespace(count=0) %}
+{% for title, outcome, render, show_notes in tools %}
+{% if outcome %}
+{% set ns.count = ns.count + 1 %}
+{{ addendum("Addendum " ~ ns.count|letter ~ ": " ~ title, outcome, render, show_notes) }}
+{% endif %}
+{% endfor %}
+{% set ns.count = ns.count + 1 %}
+{{ labels_addendum("Addendum " ~ ns.count|letter ~ ": Labels") }}
+{% endblock %}
+
+{# A reference glossary of the short labels used in the tables above; collapsed by default. #}
+{% macro labels_addendum(title) %}
+<details class="addendum">
+    <summary class="addendum-head">{{ title }}</summary>
+    <div class="addendum-body">
+    <p class="hint">The short labels used in the module, circuit, type, role and flag columns of the tables above.</p>
+    <div class="legend-row">
+        {% for group, items in LABEL_GLOSSARY.items() %}
+        {{ m.legend_block(group, items) }}
+        {% endfor %}
+    </div>
+    </div>
+</details>
+{% endmacro %}
+
+{# One tool's full result, or the error / skip that replaced it; collapsed by default. `render` is the tool's section macro. #}
+{% macro addendum(title, outcome, render, show_notes=true) %}
+<details class="addendum">
+    <summary class="addendum-head">{{ title }}</summary>
+    <div class="addendum-body">
+    {% if outcome.error %}
+    {{ m.error_banner(outcome.error) }}
+    {% elif not outcome.ran %}
+    <p class="text-muted">Not run.</p>
+    {% elif outcome.result %}
+    {% set cmeta = outcome.result.meta or {} %}
+    {{ m.message_panel("Warnings", cmeta.warnings, "warning") }}
+    {% if show_notes %}{{ m.message_panel("Notes", cmeta.notes) }}{% endif %}
+    {{ render(outcome.result) }}
+    {% else %}
+    <p class="text-muted">No result.</p>
+    {% endif %}
+    </div>
+</details>
+{% endmacro %}
