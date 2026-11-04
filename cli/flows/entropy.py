@@ -18,7 +18,6 @@ from rich.text import Text
 from cli.common import (
     Session,
     ask_int,
-    messages,
     number,
     present,
     require,
@@ -28,7 +27,6 @@ from cli.common import (
 from cli.flows.weights import model_inputs
 from cli.running import run_job
 from cli.selection import ModelChoice, model_lines, select_model
-from cli.ui import build_table
 from progress import CancelToken, ProgressSink, Stage
 from settings import (
     DEFAULT_ENTROPY_BINS,
@@ -41,7 +39,6 @@ if TYPE_CHECKING:
     from analysis.entropy import EntropyResult
 
 TITLE = "Entropy Analysis"
-TOP_TENSORS = 15
 MIN_BINS = 2
 
 
@@ -62,13 +59,17 @@ def run_entropy(session: Session) -> None:
 
 def _step_base(session: Session, state: EntropyState) -> None:
     """Pick the source model (it also fixes the layer count and the scope)."""
-    state.base = select_model(session, (TITLE, "Source Model"), "Source model")
+    state.base = select_model(session, (TITLE, "Source Model"), "Source model", remember="base")
 
 
 def _step_tuned(session: Session, state: EntropyState) -> None:
     """Pick the fine-tuned model compared with the source."""
     state.tuned = select_model(
-        session, (TITLE, "Source Model", "Tuned Model"), "Tuned model", context=model_lines([("Source", state.base)])
+        session,
+        (TITLE, "Source Model", "Tuned Model"),
+        "Tuned model",
+        context=model_lines([("Source", state.base)]),
+        remember="tuned",
     )
 
 
@@ -117,15 +118,8 @@ def analyse(
 
 
 def entropy_panel(result: EntropyResult) -> list[RenderableType]:
-    """The results: counts, the two null baselines, the tensors that moved most, per-layer means."""
-    return [
-        _counts_line(result),
-        *_null_lines(result),
-        _tensor_table(result),
-        *_layer_lines(result),
-        *messages("Warnings", result.meta.warnings, "yellow"),
-        *messages("Notes", result.meta.notes[:5], "dim"),
-    ]
+    """The counts line and the two null baselines; the tensor and per-layer detail is in the report."""
+    return [_counts_line(result), *_null_lines(result)]
 
 
 def _counts_line(result: EntropyResult) -> Text:
@@ -162,37 +156,4 @@ def _null_lines(result: EntropyResult) -> list[RenderableType]:
                     number(null.z, 3),
                 )
             )
-    return lines
-
-
-def _tensor_table(result: EntropyResult) -> RenderableType:
-    """The tensors whose spectral entropy moved most."""
-    columns = ["Tensor", "Layer", "Spectral base", "Spectral tuned", "Spectral Δ", "Rank", "Value Δ"]
-    rows = [
-        [
-            tensor.name,
-            str(tensor.layer) if tensor.layer >= 0 else "head",
-            number(tensor.spectral.base),
-            number(tensor.spectral.tuned),
-            number(tensor.spectral.delta),
-            number(tensor.effective_rank),
-            number(tensor.value.delta),
-        ]
-        for tensor in result.tensors[:TOP_TENSORS]
-    ]
-    return build_table(columns, rows, f"Top {TOP_TENSORS} tensors by spectral entropy shift")
-
-
-def _layer_lines(result: EntropyResult) -> list[RenderableType]:
-    """Mean entropy shift per layer, spectral and value."""
-    lines: list[RenderableType] = [Text("Mean entropy shift per layer", style="bold")] if result.by_layer else []
-    for group in result.by_layer:
-        label = "head" if group.layer == -1 else f"layer {group.layer}"
-        lines.append(
-            Text(
-                f"  {label:>9}  spectral Δ {number(group.mean_spectral_delta)}  "
-                f"value Δ {number(group.mean_value_delta)}  ({group.tensors} tensors)",
-                style="dim",
-            )
-        )
     return lines

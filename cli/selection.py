@@ -16,7 +16,7 @@ from __future__ import annotations
 import os
 from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 from rich.console import RenderableType
 from rich.text import Text
@@ -32,6 +32,8 @@ if TYPE_CHECKING:
 
 REFERENCE_HINT = "A local folder or .gguf file, or a Hugging Face repository id (e.g. Qwen/Qwen2.5-1.5B)."
 COMPLETION_HINT = "Press Tab to complete paths, the cached models and, for a Hub id, models found on the Hub."
+
+ModelRole = Literal["base", "tuned"]  # the slot a prompt's choice is remembered under, for the session's runtime
 
 
 @dataclass(frozen=True)
@@ -72,6 +74,7 @@ def select_model(
     context: Sequence[RenderableType] = (),
     allow_adapter: bool = True,
     offer_base: bool = True,
+    remember: ModelRole | None = None,
 ) -> ModelChoice:
     """Ask for a model reference until a usable one is given.
 
@@ -82,6 +85,9 @@ def select_model(
         context: lines shown above the prompt (the models chosen so far).
         allow_adapter: whether a LoRA adapter is acceptable here.
         offer_base: whether an adapter's base may be replaced.
+        remember: the session slot this choice fills -- the prompt defaults to the
+            reference last chosen for that role, and the new choice updates it, so the
+            same models carry across tools within one run (never saved between runs).
 
     Returns:
         The detected model and the user's follow-up choices.
@@ -91,14 +97,17 @@ def select_model(
     """
     choice: ModelChoice | None = None
     notice: list[RenderableType] = []
+    default = session.model_defaults.get(remember, models_root()) if remember else models_root()
     while choice is None:
         _show_prompt(session.ui, trail, [*context, *notice])
         completer = reference_completer(session.hf_token) if session.ui.supports_completion else None
-        answer = session.ui.ask(question, default=models_root(), completer=completer)
+        answer = session.ui.ask(question, default=default, completer=completer)
         reference = answer.strip().strip('"')
         if not reference:
             raise GoBack
         choice, notice = _resolve(session, reference, allow_adapter, offer_base)
+    if remember:
+        session.model_defaults[remember] = choice.ref
     return choice
 
 

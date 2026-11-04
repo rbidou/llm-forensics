@@ -15,7 +15,7 @@ from typing import TYPE_CHECKING
 from rich.console import RenderableType
 from rich.text import Text
 
-from cli.common import Session, ask_path, messages, present, preview, require, run_steps, save_report
+from cli.common import Session, ask_path, present, preview, require, run_steps, save_report
 from cli.running import run_job
 from cli.selection import ModelChoice, model_lines, select_model
 from cli.ui import Choice, GoBack, build_table
@@ -26,6 +26,7 @@ if TYPE_CHECKING:
     from analysis.assessment import AssessmentResult
 
 TITLE = "Analyse a Model"
+ASSESSMENT_SIGNALS_SHOWN = 8  # cap the signals table so the summary never pushes the header off-screen
 # Risk level -> rich style (mirrors the report's .verdict classes).
 RISK_STYLES: dict[str, str] = {"clean": "green", "low": "cyan", "elevated": "yellow", "high": "red"}
 
@@ -51,7 +52,7 @@ def run_assessment(session: Session) -> None:
 
 def _step_suspect(session: Session, state: AssessState) -> None:
     """Pick the model to analyse."""
-    state.suspect = select_model(session, (TITLE, "Model"), "Model to analyse")
+    state.suspect = select_model(session, (TITLE, "Model"), "Model to analyse", remember="tuned")
 
 
 def _step_source(session: Session, state: AssessState) -> None:
@@ -65,7 +66,11 @@ def _step_source(session: Session, state: AssessState) -> None:
     )
     if ui.choose(options).key == "provide":
         state.source = select_model(
-            session, (TITLE, "Source"), "Source model", context=model_lines([("Model", state.suspect)])
+            session,
+            (TITLE, "Source"),
+            "Source model",
+            context=model_lines([("Model", state.suspect)]),
+            remember="base",
         )
     else:
         state.source = None
@@ -185,19 +190,20 @@ def _assess(
 
 
 def assessment_panel(result: AssessmentResult) -> list[RenderableType]:
-    """The verdict, the executive summary, the per-tool signals and the warnings."""
+    """The risk and confidence lines and the signals table; the executive summary and warnings are in the report."""
     verdict = result.verdict
     style = RISK_STYLES.get(verdict.level, "")
     return [
         Text.assemble((f"{verdict.level.upper()} RISK", f"bold {style}"), "  ", verdict.headline),
         Text(f"confidence {verdict.confidence}  ·  {verdict.flags} red flag(s)", style="dim"),
-        *(Text(f"  {line}", style="dim") for line in result.executive.as_lines()),
         _signals_table(result.signals),
-        *messages("Warnings", result.meta.warnings, "yellow"),
     ]
 
 
 def _signals_table(signals: list) -> RenderableType:  # type: ignore[type-arg]  # list[Signal]; avoids a torch import
-    """The per-tool signals, strongest first."""
-    rows = [[str(signal.severity), signal.tool, signal.title, preview(signal.detail)] for signal in signals]
+    """The per-tool signals, strongest first, capped so the summary stays on one screen."""
+    rows = [
+        [str(signal.severity), signal.tool, signal.title, preview(signal.detail)]
+        for signal in signals[:ASSESSMENT_SIGNALS_SHOWN]
+    ]
     return build_table(("Severity", "Tool", "Finding", "Detail"), rows, "Signals (strongest first)")

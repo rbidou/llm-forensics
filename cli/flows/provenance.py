@@ -18,8 +18,6 @@ from rich.text import Text
 from cli.common import (
     Session,
     ask_int,
-    messages,
-    number,
     present,
     require,
     run_steps,
@@ -28,7 +26,6 @@ from cli.common import (
 )
 from cli.running import run_job
 from cli.selection import ModelChoice, model_lines, select_model
-from cli.ui import build_table
 from progress import CancelToken, ProgressSink, Stage
 from settings import DEFAULT_LAYERS, DEFAULT_TOP_K, MAX_LAYERS, MAX_TOP_K
 
@@ -36,7 +33,6 @@ if TYPE_CHECKING:
     from analysis.provenance import ProvenanceResult
 
 TITLE = "Provenance"
-SKIPPED_SHOWN = 10
 # Verdict ranks (see analysis.provenance): 5 identical, 4 same basis, 3 related, 2 transformed, 0 none.
 STRONG_RANK = 4
 WEAK_RANK = 2
@@ -63,7 +59,7 @@ def run_provenance(session: Session) -> None:
 
 def _step_suspect(session: Session, state: ProvenanceState) -> None:
     """Pick the model under investigation."""
-    state.suspect = select_model(session, (TITLE, "Suspect"), "Suspect model", offer_base=True)
+    state.suspect = select_model(session, (TITLE, "Suspect"), "Suspect model", offer_base=True, remember="tuned")
 
 
 def _step_candidates(session: Session, state: ProvenanceState) -> None:
@@ -130,17 +126,13 @@ def analyse(
 
 
 def provenance_panel(result: ProvenanceResult) -> list[RenderableType]:
-    """The verdict banner, the ranking, skipped candidates and warnings."""
+    """The verdict banner and a counts line; the ranking and skipped candidates are in the report."""
     counts = Text(
         f"Suspect {result.suspect.ref} ({result.suspect.label}, {result.suspect.architecture})  "
         f"gathered {result.gathered}  compatible {result.compatible}  screened {len(result.screen)}  "
         f"deep-compared {len(result.deep)}"
     )
-    panel: list[RenderableType] = [verdict_banner(result), counts, _ranking_table(result)]
-    if result.skipped:
-        rows = [[item.ref, item.origin, item.reason] for item in result.skipped[:SKIPPED_SHOWN]]
-        panel.append(build_table(("Candidate", "Origin", "Reason"), rows, f"Skipped ({len(result.skipped)})"))
-    return [*panel, *messages("Warnings", result.meta.warnings, "yellow"), *messages("Notes", result.meta.notes, "dim")]
+    return [verdict_banner(result), counts]
 
 
 def verdict_banner(result: ProvenanceResult) -> Panel:
@@ -154,12 +146,3 @@ def verdict_banner(result: ProvenanceResult) -> Panel:
     elif top is not None:
         text.append(f"\nClosest: {top.ref} - {top.verdict}", style="dim")
     return Panel(text, border_style=style, title="Verdict", title_align="left")
-
-
-def _ranking_table(result: ProvenanceResult) -> RenderableType:
-    """Every deep-compared candidate, strongest evidence first."""
-    rows = [
-        [str(index), item.ref, item.origin, str(item.rank), item.verdict, number(item.raw_med), number(item.inv_mean)]
-        for index, item in enumerate(result.ranking, start=1)
-    ]
-    return build_table(("#", "Candidate", "Origin", "Rank", "Verdict", "Raw cos (med)", "Invariant r"), rows, "Ranking")

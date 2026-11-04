@@ -8,7 +8,6 @@ with the report saved.
 
 from __future__ import annotations
 
-from collections.abc import Sequence
 from dataclasses import dataclass
 from functools import partial
 from typing import TYPE_CHECKING
@@ -19,26 +18,21 @@ from rich.text import Text
 from cli.common import (
     Session,
     ask_int,
-    messages,
-    number,
     present,
     require,
     run_steps,
     save_report,
-    tokens_line,
 )
 from cli.flows.weights import model_inputs
 from cli.running import run_job
 from cli.selection import ModelChoice, model_lines, select_model
-from cli.ui import build_table
 from progress import CancelToken, ProgressSink, Stage
 from settings import DEFAULT_TOKENS, DEFAULT_UPDATES, MAX_TOKENS, MAX_UPDATES
 
 if TYPE_CHECKING:
-    from analysis.shifts import AxisEnd, EmbeddingRows, TokenShiftResult, TopUpdate
+    from analysis.shifts import TokenShiftResult
 
 TITLE = "Token Shifts"
-TOKENS_SHOWN = 8
 
 
 @dataclass
@@ -58,13 +52,17 @@ def run_shifts(session: Session) -> None:
 
 def _step_base(session: Session, state: ShiftsState) -> None:
     """Pick the reference model (it also provides the tokenizer)."""
-    state.base = select_model(session, (TITLE, "Base Model"), "Base model")
+    state.base = select_model(session, (TITLE, "Base Model"), "Base model", remember="base")
 
 
 def _step_tuned(session: Session, state: ShiftsState) -> None:
     """Pick the model compared with the base."""
     state.tuned = select_model(
-        session, (TITLE, "Base Model", "Tuned Model"), "Tuned model", context=model_lines([("Base", state.base)])
+        session,
+        (TITLE, "Base Model", "Tuned Model"),
+        "Tuned model",
+        context=model_lines([("Base", state.base)]),
+        remember="tuned",
     )
 
 
@@ -117,50 +115,10 @@ def analyse(
 
 
 def shifts_panel(result: TokenShiftResult) -> list[RenderableType]:
-    """The results: counts, top updates with their tokens, embedding rows, warnings."""
+    """The counts and vocabulary summary; the heaviest updates and their tokens are in the report."""
     counts = result.counts
     summary = Text(
         f"Compared {counts.compared}  changed {counts.changed}  identical {counts.identical}  "
         f"unmatched {counts.unmatched}  vocabulary {result.vocabulary:,}"
     )
-    return [
-        summary,
-        update_table(result.top_updates),
-        *embedding_lines(result.embedding_rows),
-        *messages("Warnings", result.meta.warnings, "yellow"),
-        *messages("Notes", result.meta.notes[:5], "dim"),
-    ]
-
-
-def update_table(updates: Sequence[TopUpdate], title: str = "Heaviest updates") -> RenderableType:
-    """One row per update: its size and the tokens at both ends of its direction."""
-    rows = [
-        [
-            update.name,
-            number(update.sigma),
-            f"{update.share:.0%}",
-            number(update.rel_change),
-            update.projection.relation if update.projection else "-",
-            _end_text(update.projection.positive if update.projection else None),
-            _end_text(update.projection.negative if update.projection else None),
-        ]
-        for update in updates
-    ]
-    columns = ("Tensor", "sigma1", "Share", "Rel. change", "Reading", "+ end (null z)", "- end (null z)")
-    return build_table(columns, rows, title)
-
-
-def _end_text(end: AxisEnd | None) -> str:
-    """The first tokens of one end of a direction, and how far they stand from random directions."""
-    result = "-"
-    if end is not None:
-        result = f"{tokens_line([token.text for token in end.tokens[:TOKENS_SHOWN]])}  (z {number(end.null.z, 3)})"
-    return result
-
-
-def embedding_lines(rows: Sequence[EmbeddingRows]) -> list[RenderableType]:
-    """The tokens whose embedding (or unembedding) rows moved most."""
-    lines: list[RenderableType] = [Text("Embedding rows that moved most", style="bold")] if rows else []
-    for item in rows:
-        lines.append(Text.assemble(f"  {item.name}: ", (tokens_line([token.text for token in item.tokens]), "cyan")))
-    return lines
+    return [summary]

@@ -17,9 +17,6 @@ from rich.text import Text
 
 from cli.common import (
     Session,
-    bar,
-    messages,
-    number,
     present,
     require,
     run_steps,
@@ -27,14 +24,13 @@ from cli.common import (
 )
 from cli.running import run_job
 from cli.selection import ModelChoice, model_lines, select_model
-from cli.ui import GoBack, build_table
+from cli.ui import GoBack
 from progress import CancelToken, ProgressSink, Stage
 
 if TYPE_CHECKING:
     from analysis.weights import WeightDiffResult
 
 TITLE = "Weight Diff"
-TOP_TENSORS = 15
 
 
 @dataclass
@@ -52,13 +48,17 @@ def run_weights(session: Session) -> None:
 
 def _step_base(session: Session, state: WeightsState) -> None:
     """Pick the reference model."""
-    state.base = select_model(session, (TITLE, "Base Model"), "Base model")
+    state.base = select_model(session, (TITLE, "Base Model"), "Base model", remember="base")
 
 
 def _step_tuned(session: Session, state: WeightsState) -> None:
     """Pick the model compared with the base."""
     state.tuned = select_model(
-        session, (TITLE, "Base Model", "Tuned Model"), "Tuned model", context=model_lines([("Base", state.base)])
+        session,
+        (TITLE, "Base Model", "Tuned Model"),
+        "Tuned model",
+        context=model_lines([("Base", state.base)]),
+        remember="tuned",
     )
 
 
@@ -102,14 +102,8 @@ def model_inputs(base: ModelChoice, tuned: ModelChoice) -> dict[str, str]:
 
 
 def weights_panel(result: WeightDiffResult) -> list[RenderableType]:
-    """The results: counts, the heaviest tensors, per-layer bars, warnings."""
-    return [
-        _counts_line(result),
-        _tensor_table(result),
-        *_layer_lines(result),
-        *messages("Warnings", result.meta.warnings, "yellow"),
-        *messages(f"Notes ({len(result.meta.notes)})", result.meta.notes[:5], "dim"),
-    ]
+    """The summary line; the full tensor and per-layer detail is in the saved report."""
+    return [_counts_line(result)]
 
 
 def _counts_line(result: WeightDiffResult) -> Text:
@@ -127,35 +121,3 @@ def _counts_line(result: WeightDiffResult) -> Text:
     if result.beyond_noise is not None:
         text.append_text(Text.assemble(("  beyond quantization noise ", "bold yellow"), str(result.beyond_noise)))
     return text
-
-
-def _tensor_table(result: WeightDiffResult) -> RenderableType:
-    """The heaviest tensors by relative change."""
-    quantized = result.beyond_noise is not None
-    columns = ["Tensor", "Layer", "Rel. change", "Cosine", "Changed", "Rank"]
-    columns += ["Noise floor", "Beyond noise"] if quantized else []
-    rows = []
-    for change in result.tensors[:TOP_TENSORS]:
-        cells = [
-            change.name,
-            str(change.layer) if change.layer >= 0 else "-",
-            number(change.rel_change),
-            number(change.cosine, 6),
-            f"{change.frac_changed:.1%}",
-            number(change.delta_rank),
-        ]
-        rows.append(cells + ([number(change.noise_floor), number(change.beyond_noise)] if quantized else []))
-    return build_table(columns, rows, f"Top {TOP_TENSORS} tensors by relative change")
-
-
-def _layer_lines(result: WeightDiffResult) -> list[RenderableType]:
-    """Mean relative change per layer, as bars."""
-    peak = max((group.mean_rel_change for group in result.by_layer), default=0.0)
-    lines: list[RenderableType] = [Text("Mean relative change per layer", style="bold")] if result.by_layer else []
-    for group in result.by_layer:
-        label = "other" if group.key == -1 else f"layer {group.key}"
-        lines.append(
-            Text.assemble(f"  {label:>9} ", (bar(group.mean_rel_change, peak), "dark_orange"), " ")
-            + Text(f"{number(group.mean_rel_change)} ({group.tensors} tensors)", style="dim")
-        )
-    return lines

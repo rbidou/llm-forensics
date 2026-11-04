@@ -38,7 +38,7 @@ from progress import CancelToken, ProgressSink, Stage
 from settings import DEFAULT_MAX_SIZE_GB, DEFAULT_VARIANTS, MAX_VARIANTS
 
 if TYPE_CHECKING:
-    from analysis.lineage import LineageDiscovery, LineageResult, PairResult
+    from analysis.lineage import LineageDiscovery, LineageResult
     from analysis.tokens import TokenDecoder
 
 TITLE = "Hub Lineage"
@@ -203,19 +203,6 @@ def parent_decoder(hf_token: str | None, parent: str) -> TokenDecoder:
 
 
 def lineage_panel(result: LineageResult) -> list[RenderableType]:
-    """One row per pair: what was compared and the heaviest update, or why it failed."""
-    rows = [_pair_row(index, pair) for index, pair in enumerate(result.pairs, start=1)]
-    table = build_table(("#", "Parent", "Child", "Kind", "Changed", "Heaviest update"), rows, "Pairs")
-    return [table, *messages("Warnings", result.meta.warnings, "yellow")]
-
-
-def _pair_row(index: int, pair: PairResult) -> list[str | Text]:
-    """The summary cells of one compared pair."""
-    changed: str | Text = Text(f"failed: {pair.error}", style="red")
-    heaviest = "-"
-    if pair.shifts is not None:
-        counts = pair.shifts.counts
-        changed = f"{counts.changed}/{counts.compared}"
-        updates = pair.shifts.top_updates
-        heaviest = f"{updates[0].name} (sigma1 {number(updates[0].sigma, 3)})" if updates else "-"
-    return [str(index), pair.pair.parent, pair.pair.child, pair.pair.kind.value, changed, heaviest]
+    """A one-line count of the compared pairs; the per-pair detail is in the report."""
+    failed = sum(1 for pair in result.pairs if pair.error)
+    return [Text(f"{len(result.pairs)} pair(s) compared, {failed} failed")]

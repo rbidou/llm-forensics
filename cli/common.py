@@ -42,7 +42,6 @@ EMPTY_TOKEN = "∅"
 
 S = TypeVar("S")
 Step = Callable[["Session", S], None]
-Action = Callable[[], RenderableType]
 
 
 @dataclass
@@ -53,6 +52,7 @@ class Session:
     store: ReportStore
     runner: JobRunner = field(default_factory=JobRunner)
     hf_token: str | None = None
+    model_defaults: dict[str, str] = field(default_factory=dict)  # last model chosen per role ("base"/"tuned")
 
 
 def new_session(ui: Ui | None = None, store: ReportStore | None = None) -> Session:
@@ -171,7 +171,7 @@ def save_report(session: Session, result: Any) -> tuple[ReportRecord | None, lis
     lines: list[RenderableType]
     try:
         record = session.store.save(result)
-        lines = [Text(f"Report saved: {record.id}", style="green"), Text(record.html_path, style="dim")]
+        lines = [Text(f"Report saved: {record.id}", style="green")]
     except (OSError, ValueError) as error:
         lines = [Text(f"The report could not be saved: {error}", style="red")]
     return record, lines
@@ -184,38 +184,32 @@ def open_in_browser(path: str) -> RenderableType:
     return Text(f"Opened {uri}" if opened else f"No browser could be started. Open {uri}", style="green")
 
 
-def present(
-    session: Session,
-    panel: Sequence[RenderableType],
-    record: ReportRecord | None,
-    extras: Sequence[tuple[Choice, Action]] = (),
-) -> None:
-    """Show an analysis' results and offer what can be done with them, until the user leaves.
+def present(session: Session, panel: Sequence[RenderableType], record: ReportRecord | None) -> None:
+    """Show an analysis' summary and offer to open its full report, until the user leaves.
+
+    The panel holds the summary only; the complete results live in the saved HTML report,
+    which the user opens on demand (silently, with no status echo).
 
     Args:
         session: the running session.
-        panel: the results, shown above the actions.
+        panel: the summary, shown above the actions.
         record: the saved report, or None when it could not be saved.
-        extras: flow-specific actions, each returning the status line it produced.
 
     Raises:
         GoBack: on an empty answer or ``back``.
         GoHome: when the user picks Home.
     """
-    actions: dict[str, Action] = {choice.key: action for choice, action in extras}
-    if record is not None:
-        actions["open"] = lambda: open_in_browser(record.html_path)
     options = [
-        Choice("open", "Open the HTML report in the browser", "", record is not None, "The report was not saved."),
-        *(choice for choice, _ in extras),
+        Choice("open", "Open the full report in the browser", "", record is not None, "The report was not saved."),
         Choice("home", "Home"),
     ]
-    status: list[RenderableType] = []
     while True:
-        chosen = session.ui.choose(options, *panel, *status)
+        # A blank line sets the summary apart from the actions below it.
+        chosen = session.ui.choose(options, *panel, Text(""))
         if chosen.key == "home":
             raise GoHome
-        status = [actions[chosen.key]()]
+        if record is not None:
+            open_in_browser(record.html_path)
 
 
 # --- formatting ------------------------------------------------------------

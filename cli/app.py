@@ -104,7 +104,7 @@ def run_session(session: Session) -> int:
 def one_action(session: Session) -> None:
     """Offer the home menu and run whatever the user picked."""
     ui = session.ui
-    ui.goto(HOME)
+    ui.goto()  # the home menu carries no trail label; the menu sits under the header
     choice = ui.choose(main_menu(detect()))
     if choice.key == QUIT:
         raise ExitRequested

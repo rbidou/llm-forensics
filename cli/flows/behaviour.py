@@ -113,13 +113,17 @@ def run_behaviour(session: Session) -> None:
 
 def _step_base(session: Session, state: BehaviourState) -> None:
     """Pick the reference model (not an adapter: it is loaded as is)."""
-    state.base = select_model(session, (TITLE, "Base Model"), "Base model", allow_adapter=False)
+    state.base = select_model(session, (TITLE, "Base Model"), "Base model", allow_adapter=False, remember="base")
 
 
 def _step_tuned(session: Session, state: BehaviourState) -> None:
     """Pick the model compared with the base."""
     state.tuned = select_model(
-        session, (TITLE, "Base Model", "Tuned Model"), "Tuned model", context=model_lines([("Base", state.base)])
+        session,
+        (TITLE, "Base Model", "Tuned Model"),
+        "Tuned model",
+        context=model_lines([("Base", state.base)]),
+        remember="tuned",
     )
 
 
@@ -178,7 +182,7 @@ def _step_run(session: Session, state: BehaviourState) -> None:
     result = run_job(session, (TITLE, "Probing"), Stage.BEHAVIOUR, work)
     record, saved = save_report(session, result)
     session.ui.goto(TITLE, "Results")
-    present(session, [*behaviour_panel(result), *saved], record)
+    present(session, [*behaviour_summary(result), *saved], record)
 
 
 def batch_probe(
@@ -511,22 +515,4 @@ def behaviour_summary(result: BehaviourResult) -> list[RenderableType]:
             f"max KL {number(result.max_kl)}{z_text}",
             style="bold",
         ),
-    ]
-
-
-def behaviour_panel(result: BehaviourResult) -> list[RenderableType]:
-    """The batch results: summary, per-prompt table, hottest positions, token shifts, errors."""
-    rows = [
-        [str(item.prompt + 1), preview(item.text), str(item.positions), number(item.mean_kl), number(item.max_kl)]
-        for item in result.prompts
-    ]
-    errors = [f"prompt {error.prompt + 1} ({error.kind}): {error.message}" for error in result.errors]
-    return [
-        *behaviour_summary(result),
-        build_table(("#", "Prompt", "Positions", "Mean KL", "Max KL"), rows, "Prompts"),
-        hottest_table(result.hottest[:HOTTEST_SHOWN]),
-        *shift_lines(result.promoted, result.suppressed),
-        *generation_lines(result.generations),
-        *messages("Errors", errors, "red"),
-        *messages("Warnings", result.meta.warnings, "yellow"),
     ]

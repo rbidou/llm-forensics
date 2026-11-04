@@ -135,7 +135,15 @@ class LineReader:
         answer: str | None = None
         if self.interactive:
             try:
-                answer = rich_prompt(question, completer=completer, complete_while_typing=completer is not None)
+                # reserve_space_for_menu=0: the completion dropdown must not reserve lines below the
+                # prompt, which would scroll the whole screen (header included) up as soon as the
+                # prompt opens. It still expands while the user is completing.
+                answer = rich_prompt(
+                    question,
+                    completer=completer,
+                    complete_while_typing=completer is not None,
+                    reserve_space_for_menu=0,
+                )
             except Exception:  # noqa: BLE001 - any terminal problem means fall back
                 self.interactive = False
         return _plain_input(question) if answer is None else answer
@@ -296,6 +304,11 @@ class Ui:
                 f"Cannot prompt while a progress bar is running: {question!r}. "
                 "Ask for this before entering the progress context."
             )
+        # Repaint before every prompt so the header is redrawn at the top and each
+        # question replaces the previous one on the bottom line rather than printing
+        # beneath it (several questions in one step would otherwise stack and push
+        # the header off the screen).
+        self._dirty = True
         self._flush()
         answer = self._reader(question, completer)
         _check_navigation(answer)
@@ -350,22 +363,27 @@ class Ui:
             self._paint()
 
     def _paint(self) -> None:
-        """Draw the header, trail, panel and separator, pushing the footer down."""
-        header, trail = self._header(), self._trail_line()
+        """Draw the header, trail, panel and separator, pushing the footer down.
+
+        A step with no trail (the home menu) drops the trail line and the blank
+        below it, so the menu sits one blank line under the header.
+        """
+        header = self._header()
         self.console.clear()
         self.console.print(header)
         self.console.print()
-        self.console.print(trail)
-        self.console.print()
+        if self._trail:
+            self.console.print(self._trail_line())
+            self.console.print()
         for item in self._panel:
             self.console.print(item)
         self.console.print()
-        for _ in range(self._filler_height(header, trail)):
+        for _ in range(self._filler_height(header)):
             self.console.print()
         self.console.print(Rule(COMMAND_HINT, style="dim", characters="-"))
         self.console.print()
 
-    def _filler_height(self, header: RenderableType, trail: RenderableType) -> int:
+    def _filler_height(self, header: RenderableType) -> int:
         """Blank lines needed to push the separator and prompt to the bottom.
 
         Only meaningful on a real terminal; piped output has no bottom to pin
@@ -373,7 +391,9 @@ class Ui:
         """
         result = 0
         if self.console.is_terminal:
-            used = self._measure(header) + 1 + self._measure(trail) + 1
+            used = self._measure(header) + 1
+            if self._trail:
+                used += self._measure(self._trail_line()) + 1
             used += sum(self._measure(item) for item in self._panel)
             result = max(0, self.console.size.height - used - FOOTER_HEIGHT)
         return result
@@ -407,6 +427,8 @@ class Ui:
         table.add_column(overflow="fold")
         for number, option in numbered:
             if option.heading:
+                if table.row_count:  # a blank line sets each section apart from the one above it
+                    table.add_row("", "", "")
                 table.add_row("", Text(option.label, style=f"bold {ACCENT}"), "")
             elif option.enabled:
                 table.add_row(Text(number or "", style=ACCENT), Text(option.label), Text(option.detail, style="dim"))
